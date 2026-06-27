@@ -27,3 +27,20 @@ STEP 4 — VRM considered fully RUNNING
 9. VRM-PT-060 ≤ L2   (hydraulic pressure too low)
 10. VRM-PT-060 ≥ H2  (hydraulic pressure too high)
 11. VRM-LSL-081       (hydraulic oil tank low level)
+
+# BAG FILTER TRIP LOGIC
+KBF-DP-800 ≥ H2 (severe clogging)
+  → 60 min timer → system trip
+  → Reasoning: excess pressure has a buffer path (VRM/calciner), tolerable delay
+
+KBF-DP-800 ≤ L2 (suspected bag rupture)
+  → 5 min timer → system trip
+  → Reasoning: no buffer, continuous uncontrolled emissions, only delay = orderly shutdown prep
+
+KBF-MD-801-XF (ID fan fault)
+  → Immediate system-wide trip
+  → Reasoning: loss of draft collapses entire gas path (kiln → GCT → bag filter → stack)
+
+KBF-CS-805 = FALSE (LOGO PLC comm loss)
+  → No automatic trip — procedural escalation to instrument supervisor
+  → Reasoning: consistent with your VRM roller-mismatch decision — human verification, not system-enforced

@@ -69,3 +69,13 @@ VRM-LSL-081  Oil tank low level
 
 ROLLER POSITION
 VRM-LS-050 to 053 — ZSU / ZSD (4 rollers)
+
+# BAG FILTER TAG LIST
+KBF-DP-800        Differential pressure (single transmitter)
+KBF-MD-801        ID Fan (equipment)
+KBF-MD-801-XS     Running feedback
+KBF-MD-801-XF     Fault feedback
+KBF-VT-802        Fan vibration
+KBF-TT-803        Bearing temperature
+KBF-PT-804        Air receiver pressure
+KBF-CS-805        LOGO PLC communication/active status
