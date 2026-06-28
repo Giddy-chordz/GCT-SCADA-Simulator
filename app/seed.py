@@ -140,34 +140,34 @@ for i in range(501, 511):
 #=======================ANALOG TAGS================================
 analog_tags = [
     #VRM inlet and outlet temperature
-    AnalogTags(tag_id = "VRM-TT-030", process_val = None, param_unit = "°C", l1_val = 150, l2_val = 130, h1_val = 250, h2_val = 280),
-    AnalogTags(tag_id = "VRM-TT-031", process_val = None, param_unit = "°C", l1_val = None, l2_val = None, h1_val = None, h2_val = None),
+    AnalogTags(tag_id = "VRM-TT-030", process_val = 30, param_unit = "°C", l1_val = 150, l2_val = 130, h1_val = 250, h2_val = 280),
+    AnalogTags(tag_id = "VRM-TT-031", process_val = 30, param_unit = "°C", l1_val = None, l2_val = None, h1_val = None, h2_val = None),
 
     #VRM vibrations; millbody, drive and gb
-    AnalogTags(tag_id = "VRM-VT-040", process_val = None, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 12, h2_val = 15),
-    AnalogTags(tag_id = "VRM-VT-041", process_val = None, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 7, h2_val = 10),
-    AnalogTags(tag_id = "VRM-VT-042", process_val = None, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 7, h2_val = 10),
+    AnalogTags(tag_id = "VRM-VT-040", process_val = 0, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 8, h2_val = 10),
+    AnalogTags(tag_id = "VRM-VT-041", process_val = 0, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 5, h2_val = 7),
+    AnalogTags(tag_id = "VRM-VT-042", process_val = 0, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 5, h2_val = 7),
 
     #VRM roller hydraulic pressure
-    AnalogTags(tag_id = "VRM-PT-060",  process_val = None, param_unit = "bar", l1_val = 5, l2_val = 3, h1_val = 80, h2_val = 90),
+    AnalogTags(tag_id = "VRM-PT-060",  process_val = 0, param_unit = "bar", l1_val = 60, l2_val = 50, h1_val = 220, h2_val = 240),
 
     #GCT inlet and outlet temperature transmitters
-    AnalogTags(tag_id = "GCT-TT-101", process_val = None, param_unit = "°C", l1_val = None, l2_val = None, h1_val = None, h2_val = None),
-    AnalogTags(tag_id = "GCT-TT-102", process_val = None, param_unit = "°C", l1_val = 90, l2_val = 70, h1_val = 150, h2_val = 200),
+    AnalogTags(tag_id = "GCT-TT-101", process_val = 30, param_unit = "°C", l1_val = None, l2_val = None, h1_val = None, h2_val = None),
+    AnalogTags(tag_id = "GCT-TT-102", process_val = 30, param_unit = "°C", l1_val = 70, l2_val = 50, h1_val = 120, h2_val = 140),
 
     #GCT water and air flow
-    AnalogTags(tag_id = "GCT-FT-201", process_val = None, param_unit = "L/min", l1_val = 5, l2_val = 3, h1_val = 80, h2_val = 90),
-    AnalogTags(tag_id = "GCT-FT-202", process_val = None, param_unit = "L/min", l1_val = 5, l2_val = 3, h1_val = 80, h2_val = 90),
+    AnalogTags(tag_id = "GCT-FT-201", process_val = 0, param_unit = "L/min", l1_val = 800, l2_val = 500, h1_val = None, h2_val = None),
+    AnalogTags(tag_id = "GCT-FT-202", process_val = 0, param_unit = "L/min", l1_val = 5, l2_val = 2, h1_val = 25, h2_val = 30),
 
     #baghouse differential pressure
-    AnalogTags(tag_id = "KBF-DP-800", process_val = None, param_unit = "mbar", l1_val = None, l2_val = None, h1_val = 7, h2_val = 10),
+    AnalogTags(tag_id = "KBF-DP-800", process_val = 0, param_unit = "mbar", l1_val = 2, l2_val = 1, h1_val = 15, h2_val = 18),
 
     #ID fan analog signals
-    AnalogTags(tag_id = "KBF-VT-802", process_val = None, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 7, h2_val = 10),
-    AnalogTags(tag_id = "KBF-TT-803", process_val = None, param_unit = "°C", l1_val = None, l2_val = None, h1_val = 7, h2_val = 10),  
+    AnalogTags(tag_id = "KBF-VT-802", process_val = 0, param_unit = "mm/s", l1_val = None, l2_val = None, h1_val = 5, h2_val = 7),
+    AnalogTags(tag_id = "KBF-TT-803", process_val = 30, param_unit = "°C", l1_val = None, l2_val = None, h1_val = 80, h2_val = 95),  
 
     #Air receiver tank pressure
-    AnalogTags(tag_id = "KBF-PT-804", process_val = None, param_unit = "mbar", l1_val = None, l2_val = None, h1_val = 7, h2_val = 10)  
+    AnalogTags(tag_id = "KBF-PT-804", process_val = 0, param_unit = "mbar", l1_val = 5.5, l2_val = 4.5, h1_val = None, h2_val = None)  
 ]
 
 #=======================DIGITAL TAGS=============================
@@ -265,3 +265,26 @@ for i in range(501, 511):
     digital_tags.append(
         DigitalTags(tag_id = f"GCT-XV-{i}-ZSC")
     )
+
+
+#=========GROUP STATUS==========
+group_status = [
+    GroupStatus(tag_id = 'KLN-XS-001'),
+    GroupStatus(tag_id = 'KLN-XS-002')
+]
+
+db.add_all(equipments)
+db.commit()
+
+db.add_all(analog_tags)
+db.commit()
+
+db.add_all(digital_tags)
+db.commit()
+
+db.add_all(group_status)
+db.commit()
+
+db.close()
+
+print("Seeding completed.....")

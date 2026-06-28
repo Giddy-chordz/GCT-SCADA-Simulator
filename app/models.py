@@ -9,7 +9,7 @@ class Equipments(Base):
     tag_id = Column(String, primary_key = True, nullable = False) #instrument/equipment code
     equip_description = Column(String, nullable = False)
 
-    status = Column(Enum("RUNNING", "STOPPED", "TRIPPED", "ALARM", "UNKNOWN"), default = "UNKNOWN") # current state
+    status = Column(Enum("RUNNING", "STOPPED", "TRIPPED", "ALARM", "UNKNOWN",name="equipment_status_enum"), default = "UNKNOWN") # current state
     io_type = Column(String, nullable = False) # AI, DI, DO, CALC 
 
 
