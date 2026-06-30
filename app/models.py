@@ -29,7 +29,7 @@ class AnalogTags(Base):
     h1_val = Column(Float, nullable = True)  # high 1 alarm warning value
     h2_val = Column(Float, nullable = True) # High2 alarm value
 
-    time_stamp = Column(DateTime, default=datetime.utcnow) #timestamp
+    time_stamp = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) #timestamp
 
 #model for digital input
 class DigitalTags(Base):

@@ -1,3 +1,4 @@
+
 import random
 
 
@@ -51,9 +52,9 @@ class AnalogSensor:
 
 sensors = {
 
-    # =======================
-    # VRM
-    # =======================
+  
+    #=====================VRM
+    
 
     # Mill inlet temperature
     "VRM-TT-030": AnalogSensor(
@@ -87,9 +88,9 @@ sensors = {
         drift=0.20, noise=0.10, spike_probability=0.002, spike_size=8
     ),
 
-    # =======================
-    # GCT
-    # =======================
+
+    #=====================GCT
+    
 
     "GCT-TT-101": AnalogSensor(
         initial=240, minimum=80, maximum=450,
@@ -113,9 +114,9 @@ sensors = {
         drift=0.5, noise=0.2, spike_probability=0.003, spike_size=4
     ),
 
-    # =======================
-    # KBF
-    # =======================
+  
+    #=========KBF
+
 
     # Differential pressure (mbar) — matches seed l1=2, l2=1, h1=15, h2=18
     "KBF-DP-800": AnalogSensor(
