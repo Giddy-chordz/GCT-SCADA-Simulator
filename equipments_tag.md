@@ -39,7 +39,7 @@ KLN-BG-702-XF   Fault feedback
 
 KILN STATUS
 KLN-XS-001    Kiln running status
-KLN-XS-002    Kiln trip latch status ← ADD THIS
+KLN-XS-002    Kiln trip latch status 
 
 
 
