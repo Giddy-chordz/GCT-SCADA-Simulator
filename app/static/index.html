@@ -1334,26 +1334,49 @@ let cmdTagId = null;
 
 function openCmdFaceplate(tagId) {
   cmdTagId = tagId;
-  const eq = state.equip[tagId];
+  const eq     = state.equip[tagId];
   const status = eq ? (eq.status || 'UNKNOWN') : 'UNKNOWN';
+  const ioType = eq ? (eq.io_type || '') : '';
+
+  // Only DO tags (drives, pumps, valves) are commandable.
+  // DI tags (XS running feedback, XF fault feedback, sensors) are read-only.
+  const isCommandable = (ioType === 'DO');
 
   document.getElementById('cmd-tag').textContent  = tagId;
   document.getElementById('cmd-desc').textContent = eq ? eq.equip_description : tagId;
 
-  const dot  = document.getElementById('cmd-status-dot');
-  const txt  = document.getElementById('cmd-status-text');
-  dot.style.background       = STATUS_DOT_COLOR[status]  || '#484d5c';
-  txt.textContent             = status;
-  txt.style.color             = STATUS_TEXT_COLOR[status] || '#555b6e';
+  const dot = document.getElementById('cmd-status-dot');
+  const txt = document.getElementById('cmd-status-text');
+  dot.style.background = STATUS_DOT_COLOR[status]  || '#484d5c';
+  txt.textContent      = status;
+  txt.style.color      = STATUS_TEXT_COLOR[status] || '#555b6e';
 
-  // Button availability rules (ISA-101: only valid transitions enabled)
-  document.getElementById('cmd-btn-start').disabled = (status === 'RUNNING');
-  document.getElementById('cmd-btn-stop').disabled  = (status === 'STOPPED' || status === 'TRIPPED' || status === 'UNKNOWN');
-  document.getElementById('cmd-btn-reset').disabled = !(status === 'TRIPPED' || status === 'ALARM');
-  document.getElementById('cmd-btn-ack').disabled   = false; // always available
+  const btnArea = document.getElementById('cmd-buttons');
 
-  document.getElementById('cmd-feedback').textContent = '';
-  document.getElementById('cmd-feedback').className   = 'cmd-feedback';
+  if (!isCommandable) {
+    // Read-only — hide all command buttons, show IO type label
+    btnArea.style.display = 'none';
+    document.getElementById('cmd-feedback').textContent = `Read-only  (${ioType || 'DI'})`;
+    document.getElementById('cmd-feedback').className   = 'cmd-feedback';
+  } else {
+    btnArea.style.display = '';
+    const isValve = tagId.includes('-XV-');
+
+    // Start / Stop always shown for DO tags
+    document.getElementById('cmd-btn-start').disabled = (status === 'RUNNING');
+    document.getElementById('cmd-btn-stop').disabled  = (status === 'STOPPED' || status === 'UNKNOWN');
+
+    // Reset only meaningful for drives that can trip; hide for valves
+    const resetBtn = document.getElementById('cmd-btn-reset');
+    resetBtn.style.display = isValve ? 'none' : '';
+    resetBtn.disabled      = !(status === 'TRIPPED' || status === 'ALARM');
+
+    // Ack always available for DO tags
+    document.getElementById('cmd-btn-ack').disabled = false;
+
+    document.getElementById('cmd-feedback').textContent = '';
+    document.getElementById('cmd-feedback').className   = 'cmd-feedback';
+  }
 
   document.getElementById('cmd-modal').classList.add('open');
 }

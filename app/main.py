@@ -50,7 +50,7 @@ app = FastAPI(title="GCT SCADA Simulator", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5500/"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -69,20 +69,64 @@ async def health_check():
 
 
 # ── Equipment command endpoints ──────────────────────────────────────────────
+# Convention:
+#   DO tags  (e.g. VRM-MD-010)  are the command outputs — these are what the
+#   operator clicks.  Their running feedback is the -XS sibling and fault
+#   feedback is -XF.
+#   Valve DO tags (GCT-XV-*)    have -ZSO (open) and -ZSC (closed) feedbacks.
+#
+# start  → assert -XS binary_state = True  (scan cycle sees it → RUNNING)
+# stop   → de-assert -XS binary_state = False (scan cycle → STOPPED)
+# reset  → de-assert -XF, set equip status STOPPED for the drive and XF tag
+# ack    → mark all active alarms acknowledged for the tag and its feedbacks
+
+def _xs_tag(tag_id: str) -> str:
+    """Return the running-feedback tag for a DO command tag."""
+    return tag_id + "-XS"
+
+def _xf_tag(tag_id: str) -> str:
+    """Return the fault-feedback tag for a DO command tag."""
+    return tag_id + "-XF"
+
+def _zso_tag(tag_id: str) -> str:
+    """Return the open-feedback tag for a valve DO tag."""
+    return tag_id + "-ZSO"
+
+def _zsc_tag(tag_id: str) -> str:
+    """Return the closed-feedback tag for a valve DO tag."""
+    return tag_id + "-ZSC"
+
+def _is_valve(tag_id: str) -> bool:
+    return "-XV-" in tag_id
+
 
 @app.post("/cmd/{tag_id}/start", tags=["Commands"])
 async def cmd_start(tag_id: str):
-    """Set equipment status to RUNNING and assert its running feedback DI."""
+    """Assert running feedback (or open feedback for valves) so the scan cycle
+    picks up RUNNING on its next iteration."""
     db = SessionLocal()
     try:
         equip = db.query(Equipments).filter(Equipments.tag_id == tag_id).first()
         if not equip:
             raise HTTPException(status_code=404, detail=f"{tag_id} not found")
-        equip.status = "RUNNING"
-        # Assert running feedback digital tag if it exists
-        di = db.query(DigitalTags).filter(DigitalTags.tag_id == tag_id).first()
-        if di:
-            di.binary_state = True
+        if equip.io_type not in ("DO",):
+            raise HTTPException(status_code=400, detail=f"{tag_id} is not a commandable output")
+
+        if _is_valve(tag_id):
+            # Open the valve: assert ZSO, de-assert ZSC
+            zso = db.query(DigitalTags).filter(DigitalTags.tag_id == _zso_tag(tag_id)).first()
+            zsc = db.query(DigitalTags).filter(DigitalTags.tag_id == _zsc_tag(tag_id)).first()
+            if zso: zso.binary_state = True
+            if zsc: zsc.binary_state = False
+            equip.status = "RUNNING"
+        else:
+            # Motor/pump drive: assert XS running feedback
+            xs = db.query(DigitalTags).filter(DigitalTags.tag_id == _xs_tag(tag_id)).first()
+            xs_equip = db.query(Equipments).filter(Equipments.tag_id == _xs_tag(tag_id)).first()
+            if xs:       xs.binary_state = True
+            if xs_equip: xs_equip.status = "RUNNING"
+            equip.status = "RUNNING"
+
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "start"}
     finally:
@@ -91,16 +135,29 @@ async def cmd_start(tag_id: str):
 
 @app.post("/cmd/{tag_id}/stop", tags=["Commands"])
 async def cmd_stop(tag_id: str):
-    """Set equipment status to STOPPED and de-assert its running feedback DI."""
+    """De-assert running feedback (or close valve) so the scan cycle picks up
+    STOPPED on its next iteration."""
     db = SessionLocal()
     try:
         equip = db.query(Equipments).filter(Equipments.tag_id == tag_id).first()
         if not equip:
             raise HTTPException(status_code=404, detail=f"{tag_id} not found")
-        equip.status = "STOPPED"
-        di = db.query(DigitalTags).filter(DigitalTags.tag_id == tag_id).first()
-        if di:
-            di.binary_state = False
+        if equip.io_type not in ("DO",):
+            raise HTTPException(status_code=400, detail=f"{tag_id} is not a commandable output")
+
+        if _is_valve(tag_id):
+            zso = db.query(DigitalTags).filter(DigitalTags.tag_id == _zso_tag(tag_id)).first()
+            zsc = db.query(DigitalTags).filter(DigitalTags.tag_id == _zsc_tag(tag_id)).first()
+            if zso: zso.binary_state = False
+            if zsc: zsc.binary_state = True
+            equip.status = "STOPPED"
+        else:
+            xs = db.query(DigitalTags).filter(DigitalTags.tag_id == _xs_tag(tag_id)).first()
+            xs_equip = db.query(Equipments).filter(Equipments.tag_id == _xs_tag(tag_id)).first()
+            if xs:       xs.binary_state = False
+            if xs_equip: xs_equip.status = "STOPPED"
+            equip.status = "STOPPED"
+
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "stop"}
     finally:
@@ -109,19 +166,33 @@ async def cmd_stop(tag_id: str):
 
 @app.post("/cmd/{tag_id}/reset", tags=["Commands"])
 async def cmd_reset(tag_id: str):
-    """Clear TRIPPED/ALARM status back to STOPPED and reset fault DI."""
+    """Clear a TRIPPED/ALARM drive back to STOPPED: de-assert XF fault
+    feedback and reset both the command tag and XS/XF equipment statuses."""
     db = SessionLocal()
     try:
         equip = db.query(Equipments).filter(Equipments.tag_id == tag_id).first()
         if not equip:
             raise HTTPException(status_code=404, detail=f"{tag_id} not found")
-        if equip.status in ("TRIPPED", "ALARM"):
-            equip.status = "STOPPED"
-        # Clear fault feedback digital tag (XF suffix) if present
-        fault_id = tag_id.replace("-XS", "-XF") if tag_id.endswith("-XS") else tag_id + "-XF"
-        di_fault = db.query(DigitalTags).filter(DigitalTags.tag_id == fault_id).first()
-        if di_fault:
-            di_fault.binary_state = False
+        if equip.io_type not in ("DO",):
+            raise HTTPException(status_code=400, detail=f"{tag_id} is not a commandable output")
+
+        # Reset command tag
+        equip.status = "STOPPED"
+
+        # De-assert XF fault feedback DI and reset its equipment status
+        xf_id    = _xf_tag(tag_id)
+        xf_di    = db.query(DigitalTags).filter(DigitalTags.tag_id == xf_id).first()
+        xf_equip = db.query(Equipments).filter(Equipments.tag_id == xf_id).first()
+        if xf_di:    xf_di.binary_state = False
+        if xf_equip: xf_equip.status    = "STOPPED"
+
+        # De-assert XS running feedback DI and reset its equipment status
+        xs_id    = _xs_tag(tag_id)
+        xs_di    = db.query(DigitalTags).filter(DigitalTags.tag_id == xs_id).first()
+        xs_equip = db.query(Equipments).filter(Equipments.tag_id == xs_id).first()
+        if xs_di:    xs_di.binary_state = False
+        if xs_equip: xs_equip.status    = "STOPPED"
+
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "reset"}
     finally:
@@ -130,11 +201,19 @@ async def cmd_reset(tag_id: str):
 
 @app.post("/cmd/{tag_id}/ack", tags=["Commands"])
 async def cmd_ack(tag_id: str):
-    """Acknowledge all active alarms for this tag."""
+    """Acknowledge all active unacknowledged alarms for this tag and its
+    running/fault feedback siblings."""
     db = SessionLocal()
     try:
+        equip = db.query(Equipments).filter(Equipments.tag_id == tag_id).first()
+        if not equip:
+            raise HTTPException(status_code=404, detail=f"{tag_id} not found")
+
+        # Collect the tag itself plus any XS/XF siblings
+        tags_to_ack = [tag_id, _xs_tag(tag_id), _xf_tag(tag_id)]
+
         alarms = db.query(Alarm).filter(
-            Alarm.tag_id == tag_id,
+            Alarm.tag_id.in_(tags_to_ack),
             Alarm.alarm_active == True,
             Alarm.alarm_acknowledged == False,
         ).all()
