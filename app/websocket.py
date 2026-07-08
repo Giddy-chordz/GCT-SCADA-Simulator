@@ -1,10 +1,13 @@
 import asyncio
 import json
+import logging
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.database import SessionLocal
 from app.models import Alarm, AnalogTags, DigitalTags, Equipments
+
+logger = logging.getLogger(__name__)
 
 
 async def ws_tags(websocket: WebSocket):
@@ -52,15 +55,21 @@ async def ws_tags(websocket: WebSocket):
                 for row in digital_rows
             ]
 
-            equip_data = [
-                {
-                    "tag_id":           row.tag_id,
+            equip_data = []
+            for row in equip_rows:
+                if not row.io_type:
+                    logger.warning(
+                        "WebSocket: tag %s has missing/null io_type — "
+                        "command faceplate will treat it as read-only",
+                        row.tag_id,
+                    )
+                equip_data.append({
+                    "tag_id":            row.tag_id,
                     "equip_description": row.equip_description,
-                    "status":           row.status,
-                    "io_type":          row.io_type,
-                }
-                for row in equip_rows
-            ]
+                    "status":            row.status,
+                    "io_type":           row.io_type,
+                    "manual_override":   row.manual_override,
+                })
 
             alarm_data = [
                 {

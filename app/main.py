@@ -127,6 +127,9 @@ async def cmd_start(tag_id: str):
             if xs_equip: xs_equip.status = "RUNNING"
             equip.status = "RUNNING"
 
+        # Operator has explicitly started — prevent scan cycle from overriding
+        equip.manual_override = True
+
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "start"}
     finally:
@@ -158,6 +161,9 @@ async def cmd_stop(tag_id: str):
             if xs_equip: xs_equip.status = "STOPPED"
             equip.status = "STOPPED"
 
+        # Operator has explicitly stopped — prevent scan cycle from overriding
+        equip.manual_override = True
+
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "stop"}
     finally:
@@ -176,8 +182,9 @@ async def cmd_reset(tag_id: str):
         if equip.io_type not in ("DO",):
             raise HTTPException(status_code=400, detail=f"{tag_id} is not a commandable output")
 
-        # Reset command tag
+        # Reset command tag; clear manual override so the scan cycle resumes control
         equip.status = "STOPPED"
+        equip.manual_override = False
 
         # De-assert XF fault feedback DI and reset its equipment status
         xf_id    = _xf_tag(tag_id)

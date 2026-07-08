@@ -10,7 +10,12 @@ class Equipments(Base):
     equip_description = Column(String, nullable = False)
 
     status = Column(Enum("RUNNING", "STOPPED", "TRIPPED", "ALARM", "UNKNOWN",name="equipment_status_enum"), default = "UNKNOWN") # current state
-    io_type = Column(String, nullable = False) # AI, DI, DO, CALC 
+    io_type = Column(String, nullable = False) # AI, DI, DO, CALC
+
+    # When True the scan cycle skips automatic status recalculation for this
+    # drive and respects the manually set status.  Cleared only on a genuine
+    # interlock trip (safety always wins) or when RESET is issued.
+    manual_override = Column(Boolean, nullable = False, default = False)
 
 
 

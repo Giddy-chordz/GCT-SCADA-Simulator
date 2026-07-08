@@ -1337,6 +1337,8 @@ function openCmdFaceplate(tagId) {
   const eq     = state.equip[tagId];
   const status = eq ? (eq.status || 'UNKNOWN') : 'UNKNOWN';
   const ioType = eq ? (eq.io_type || '') : '';
+  // DEBUG — confirms what io_type value is being read from state for each tag
+  console.log('[CMD]', tagId, 'io_type:', ioType, 'manual_override:', eq ? eq.manual_override : undefined);
 
   // Only DO tags (drives, pumps, valves) are commandable.
   // DI tags (XS running feedback, XF fault feedback, sensors) are read-only.
@@ -1382,7 +1384,10 @@ function openCmdFaceplate(tagId) {
 }
 
 function closeCmdModal(e) {
-  if (e.target === document.getElementById('cmd-modal'))
+  // Called either from backdrop click (e is the MouseEvent) or from the ✕
+  // button (e is undefined).  Only close on backdrop click if the click
+  // target is the modal overlay itself, not a child element.
+  if (!e || e.target === document.getElementById('cmd-modal'))
     document.getElementById('cmd-modal').classList.remove('open');
 }
 
@@ -1392,17 +1397,18 @@ async function sendCmd(action) {
   fb.textContent = `Sending ${action.toUpperCase()}…`;
   fb.className   = 'cmd-feedback';
   try {
-    const res  = await fetch(`/cmd/${encodeURIComponent(cmdTagId)}/${action}`, { method: 'POST' });
-    const data = await res.json();
+    const res = await fetch(`/cmd/${encodeURIComponent(cmdTagId)}/${action}`, { method: 'POST' });
+    let data = {};
+    try { data = await res.json(); } catch (_) { /* non-JSON body */ }
     if (res.ok) {
       fb.textContent = `${action.toUpperCase()} OK`;
       fb.className   = 'cmd-feedback ok';
     } else {
-      fb.textContent = `Error: ${data.detail || res.statusText}`;
+      fb.textContent = `Error ${res.status}: ${data.detail || res.statusText}`;
       fb.className   = 'cmd-feedback err';
     }
   } catch (err) {
-    fb.textContent = `Network error`;
+    fb.textContent = `Network error — ${err.message}`;
     fb.className   = 'cmd-feedback err';
   }
 }
@@ -1425,5 +1431,53 @@ setInterval(() => {
 // ══════════════════════════════════════════════════════════
 connect();
 </script>
+<!-- COMMAND MODAL — Bob's openCmdFaceplate() JS references these IDs -->
+<div id="cmd-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
+  <div style="background:#252830; border:1px solid #484d5c; width:320px; padding:16px; font-family:'Segoe UI',Arial,sans-serif;">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #3a3e4a; padding-bottom:8px; margin-bottom:10px;">
+      <span style="font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:#7b8299;">Equipment Command</span>
+      <span style="cursor:pointer; color:#7b8299; font-size:14px;" onclick="closeCmdModal()">✕</span>
+    </div>
+
+    <div id="cmd-tag" style="font-family:Consolas,monospace; font-size:16px; color:#d4d8e2; margin-bottom:2px;">—</div>
+    <div id="cmd-desc" style="font-size:11px; color:#7b8299; margin-bottom:10px;">—</div>
+
+    <div style="display:flex; align-items:center; gap:6px; margin-bottom:14px;">
+      <span id="cmd-status-dot" style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#484d5c;"></span>
+      <span id="cmd-status-text" style="font-size:12px; font-weight:700; letter-spacing:0.05em;">UNKNOWN</span>
+    </div>
+
+    <div id="cmd-buttons" style="display:flex; flex-wrap:wrap; gap:6px;">
+      <button id="cmd-btn-start"
+        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #3d8b50; color:#5cb870; background:#1a2419; cursor:pointer;">
+        START
+      </button>
+      <button id="cmd-btn-stop"
+        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #b84a2a; color:#e06040; background:#241511; cursor:pointer;">
+        STOP
+      </button>
+      <button id="cmd-btn-ack"
+        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #b8860b; color:#e2a020; background:#241d11; cursor:pointer;">
+        ACKNOWLEDGE
+      </button>
+      <button id="cmd-btn-reset"
+        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #4a8fc1; color:#4a8fc1; background:#111d24; cursor:pointer;">
+        RESET INTERLOCK
+      </button>
+    </div>
+
+    <div id="cmd-feedback" style="margin-top:10px; font-size:10px; color:#7b8299;"></div>
+
+  </div>
+</div>
+
+<style>
+  #cmd-buttons button:disabled{
+    opacity:0.3;
+    cursor:not-allowed;
+  }
+  #cmd-modal.open{ display:flex !important; }
+</style>
 </body>
 </html>
