@@ -1,7 +1,7 @@
 #=============CONTINOUSLY UPDATING SENSOR READINGS==========
-from database import SessionLocal
-from models import AnalogTags
-from sensor_data import AnalogSensor, sensors
+from app.database import SessionLocal
+from app.models import AnalogTags
+from app.sensor_data import AnalogSensor, sensors
 import asyncio
 
 #create function to update the process values in the analog_tag table

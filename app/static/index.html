@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCT SCADA — Cement Plant Simulator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #1e2025;
+    --surface:   #252830;
+    --surface2:  #2d3038;
+    --border:    #3a3e4a;
+    --border2:   #484d5c;
+    --text:      #d4d8e2;
+    --text-muted:#7b8299;
+    --text-dim:  #555b6e;
+    --accent:    #4a8fc1;
+    --running:   #3d8b50;
+    --running-t: #5cb870;
+    --stopped:   #5a5f6e;
+    --stopped-t: #8a8fa0;
+    --tripped:   #b84a2a;
+    --tripped-t: #e06040;
+    --alarm-col: #c0392b;
+    --alarm-t:   #e74c3c;
+    --warn-col:  #b8860b;
+    --warn-t:    #e2a020;
+    --h1-col:    #c47a00;
+    --h2-col:    #b03020;
+    --l1-col:    #c47a00;
+    --l2-col:    #b03020;
+    --font: 'Segoe UI', 'Liberation Sans', Arial, sans-serif;
+    --mono: 'Consolas', 'Courier New', monospace;
+  }
+
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.4; }
+
+  /* ── LAYOUT ─────────────────────────────────────────── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* Alarm banner */
+  #alarm-banner {
+    background: #1a0c0a; border-bottom: 1px solid var(--alarm-col);
+    min-height: 26px; display: flex; align-items: center; padding: 0 8px;
+    flex-shrink: 0; overflow: hidden;
+  }
+  #alarm-banner.no-alarms { border-bottom-color: var(--border); }
+  #alarm-banner .label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    color: var(--alarm-t); margin-right: 10px; white-space: nowrap;
+    text-transform: uppercase;
+  }
+  #alarm-banner.no-alarms .label { color: var(--text-muted); }
+  #alarm-banner .scroll-text {
+    font-size: 11px; color: var(--alarm-t); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  #alarm-banner.no-alarms .scroll-text { color: var(--text-muted); }
+  /* Blink only the alarm text when alarms exist */
+  #alarm-banner.has-alarms .scroll-text { animation: alm-blink 1.1s step-end infinite; }
+  @keyframes alm-blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+  /* Title bar */
+  #titlebar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 12px; height: 36px;
+    flex-shrink: 0;
+  }
+  #titlebar .plant-name {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--text); text-transform: uppercase;
+  }
+  #titlebar .divider { margin: 0 10px; color: var(--border2); }
+  #titlebar .screen-title { font-size: 12px; color: var(--text-muted); }
+  #titlebar .spacer { flex: 1; }
+  #titlebar .conn-indicator {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--stopped); margin-right: 6px;
+  }
+  #titlebar .conn-indicator.connected { background: var(--running); }
+  #titlebar .conn-label { font-size: 11px; color: var(--text-muted); margin-right: 14px; }
+
+  /* Body */
+  #body { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 160px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  #sidebar .nav-section {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim);
+    padding: 10px 10px 4px; border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+  #sidebar .nav-section:first-child { border-top: none; margin-top: 0; }
+  #sidebar button {
+    display: block; width: 100%; text-align: left;
+    background: none; border: none; border-left: 3px solid transparent;
+    padding: 7px 10px 7px 11px; font-size: 12px; color: var(--text-muted);
+    cursor: pointer; font-family: var(--font);
+  }
+  #sidebar button:hover { background: var(--surface2); color: var(--text); }
+  #sidebar button.active {
+    border-left-color: var(--accent); background: var(--surface2); color: var(--text);
+  }
+
+  /* Content area */
+  #content { flex: 1; overflow-y: auto; padding: 12px; }
+
+  /* Screens */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* Status bar */
+  #statusbar {
+    background: var(--surface); border-top: 1px solid var(--border);
+    height: 22px; display: flex; align-items: center; padding: 0 10px;
+    flex-shrink: 0; gap: 20px;
+  }
+  #statusbar span { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+  #statusbar .sep { color: var(--border2); }
+
+  /* ── SHARED COMPONENTS ──────────────────────────────── */
+  .section-header {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding-bottom: 6px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Equipment card */
+  .equip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 8px; margin-bottom: 16px;
+  }
+  .equip-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 8px 10px; position: relative;
+  }
+  .equip-card .status-bar {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  }
+  .equip-card .tag { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+  .equip-card .desc { font-size: 11px; color: var(--text); margin-top: 2px; line-height: 1.3; }
+  .equip-card .status-label {
+    margin-top: 5px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase;
+  }
+
+  /* Status colours */
+  .s-running  .status-bar { background: var(--running); }
+  .s-running  .status-label { color: var(--running-t); }
+  .s-stopped  .status-bar { background: var(--stopped); }
+  .s-stopped  .status-label { color: var(--stopped-t); }
+  .s-tripped  .status-bar { background: var(--tripped); }
+  .s-tripped  .status-label { color: var(--tripped-t); }
+  .s-alarm    .status-bar { background: var(--alarm-col); animation: alm-blink 1.1s step-end infinite; }
+  .s-alarm    .status-label { color: var(--alarm-t); animation: alm-blink 1.1s step-end infinite; }
+  .s-unknown  .status-bar { background: var(--text-dim); }
+  .s-unknown  .status-label { color: var(--text-dim); }
+
+  /* Analog instrument row */
+  .analog-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .analog-table th {
+    text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 4px 8px; border-bottom: 1px solid var(--border);
+  }
+  .analog-table th:nth-child(n+3) { text-align: right; }
+  .analog-table td {
+    padding: 5px 8px; border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .analog-table td:nth-child(n+3) { text-align: right; font-family: var(--mono); }
+  .analog-table tr:last-child td { border-bottom: none; }
+  .analog-table tr:hover td { background: var(--surface2); }
+  .analog-table .tag-col { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+  .analog-table .val-col { font-size: 14px; font-weight: 600; color: var(--text); }
+  .analog-table .unit-col { font-size: 11px; color: var(--text-muted); }
+  .analog-table .limit-col { font-size: 10px; color: var(--text-dim); }
+  .analog-table .bar-col { width: 100px; }
+
+  .analog-table tr.row-h2 td { background: #1f0d0a; }
+  .analog-table tr.row-h2 .val-col { color: var(--alarm-t); }
+  .analog-table tr.row-h1 td { background: #1c1408; }
+  .analog-table tr.row-h1 .val-col { color: var(--warn-t); }
+  .analog-table tr.row-l2 td { background: #1f0d0a; }
+  .analog-table tr.row-l2 .val-col { color: var(--alarm-t); }
+  .analog-table tr.row-l1 td { background: #1c1408; }
+  .analog-table tr.row-l1 .val-col { color: var(--warn-t); }
+
+  /* Bar gauge */
+  .bar-gauge {
+    height: 8px; background: var(--bg); border: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .bar-fill { height: 100%; background: var(--accent); transition: width 0.4s linear; }
+  .bar-fill.fill-h1 { background: var(--warn-col); }
+  .bar-fill.fill-h2 { background: var(--alarm-col); }
+  .bar-fill.fill-l1 { background: var(--warn-col); }
+  .bar-fill.fill-l2 { background: var(--alarm-col); }
+
+  /* Digital I/O table */
+  .digital-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .digital-table th {
+    text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 4px 8px; border-bottom: 1px solid var(--border);
+  }
+  .digital-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .digital-table tr:last-child td { border-bottom: none; }
+  .digital-table tr:hover td { background: var(--surface2); }
+  .digital-table .tag-col { font-family: var(--mono); color: var(--text-muted); }
+  .dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    vertical-align: middle; margin-right: 5px;
+  }
+  .dot-on  { background: var(--running); }
+  .dot-off { background: var(--stopped); border: 1px solid var(--border2); }
+  .dot-fault { background: var(--alarm-col); }
+
+  /* Alarm summary */
+  .alarm-list { width: 100%; border-collapse: collapse; }
+  .alarm-list th {
+    text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 4px 8px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .alarm-list td { padding: 5px 8px; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .alarm-list tr:last-child td { border-bottom: none; }
+  .alarm-list tr:hover td { background: var(--surface2); }
+  .alarm-list .alarm-type-h2,
+  .alarm-list .alarm-type-l2 { color: var(--alarm-t); font-weight: 700; }
+  .alarm-list .alarm-type-h1,
+  .alarm-list .alarm-type-l1 { color: var(--warn-t); font-weight: 600; }
+  .alarm-list .tag-col { font-family: var(--mono); color: var(--text-muted); font-size: 10px; }
+  .alarm-list .ts-col  { font-family: var(--mono); color: var(--text-dim); font-size: 10px; }
+
+  /* Trend chart */
+  .trend-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .trend-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    flex: 1 1 280px; padding: 8px;
+  }
+  .trend-box .trend-title {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .trend-box .trend-val { font-size: 16px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+  .trend-box .trend-unit { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
+  canvas.sparkline { display: block; width: 100%; height: 48px; margin-top: 4px; }
+
+  /* Overview groups */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 16px;
+  }
+  @media (max-width: 900px) { .overview-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .overview-grid { grid-template-columns: 1fr; } }
+
+  .overview-group {
+    background: var(--surface2); border: 1px solid var(--border); padding: 10px;
+  }
+  .overview-group .group-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-muted);
+    border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 8px;
+  }
+  .overview-group .group-status {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 8px;
+  }
+  .overview-item {
+    display: flex; align-items: center; padding: 3px 0;
+    border-bottom: 1px solid var(--border); font-size: 11px;
+  }
+  .overview-item:last-child { border-bottom: none; }
+  .overview-item .oi-tag { font-family: var(--mono); color: var(--text-muted); font-size: 10px; width: 130px; flex-shrink: 0; }
+  .overview-item .oi-val { font-family: var(--mono); font-size: 12px; font-weight: 600; margin-left: auto; }
+  .oi-val.v-alarm { color: var(--alarm-t); }
+  .oi-val.v-warn  { color: var(--warn-t); }
+  .oi-val.v-normal{ color: var(--text); }
+
+  /* Process mimic */
+  #mimic-svg { width: 100%; height: auto; display: block; }
+
+  /* Content panels */
+  .panel-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .panel {
+    background: var(--surface2); border: 1px solid var(--border); padding: 10px; flex: 1 1 300px;
+  }
+  .panel-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    padding-bottom: 5px; margin-bottom: 8px;
+  }
+
+  .no-alarms-msg { color: var(--text-muted); font-size: 12px; padding: 10px 0; }
+
+  /* Faceplate modal — analog instrument */
+  #faceplate-modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #faceplate-modal.open { display: flex; }
+  #faceplate-box {
+    background: var(--surface); border: 1px solid var(--border2);
+    width: 320px; padding: 16px;
+  }
+  #faceplate-box .fp-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 10px;
+    display: flex; justify-content: space-between;
+  }
+  #faceplate-box .fp-close { cursor: pointer; color: var(--text-muted); font-size: 14px; }
+  #faceplate-box .fp-close:hover { color: var(--text); }
+  #faceplate-box .fp-tag { font-family: var(--mono); font-size: 18px; color: var(--text); margin-bottom: 2px; }
+  #faceplate-box .fp-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+  #faceplate-box .fp-val { font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--text); }
+  #faceplate-box .fp-unit { font-size: 13px; color: var(--text-muted); margin-left: 4px; }
+  #faceplate-box .fp-limits { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  #faceplate-box .fp-limit-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
+  #faceplate-box .fp-limit-row .lbl { color: var(--text-muted); }
+  #faceplate-box .fp-limit-row .val { font-family: var(--mono); color: var(--text); }
+
+  /* Command faceplate modal — equipment */
+  #cmd-modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.72); z-index: 110;
+    align-items: center; justify-content: center;
+  }
+  #cmd-modal.open { display: flex; }
+  #cmd-box {
+    background: var(--surface); border: 1px solid var(--border2);
+    width: 300px; padding: 16px;
+  }
+  #cmd-box .cmd-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #cmd-box .cmd-close { cursor: pointer; color: var(--text-muted); font-size: 14px; line-height: 1; }
+  #cmd-box .cmd-close:hover { color: var(--text); }
+  #cmd-box .cmd-tag  { font-family: var(--mono); font-size: 16px; color: var(--text); margin-bottom: 2px; }
+  #cmd-box .cmd-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  #cmd-box .cmd-status-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+  }
+  #cmd-box .cmd-status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  #cmd-box .cmd-status-text { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  #cmd-box .cmd-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #cmd-box .cmd-btn {
+    padding: 9px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; border: 1px solid; cursor: pointer;
+    font-family: var(--font); text-align: center; background: transparent;
+  }
+  #cmd-box .cmd-btn:disabled {
+    opacity: 0.28; cursor: not-allowed;
+  }
+  #cmd-box .cmd-btn:not(:disabled):hover { filter: brightness(1.15); }
+  #cmd-box .cmd-btn:not(:disabled):active { filter: brightness(0.9); }
+  /* ISA-101: Start=dark green, Stop=dark red, Reset=amber, Ack=steel blue */
+  #cmd-box .btn-start  { color: #5cb870; border-color: #3d8b50; }
+  #cmd-box .btn-stop   { color: #e06040; border-color: #b84a2a; }
+  #cmd-box .btn-reset  { color: #e2a020; border-color: #b8860b; }
+  #cmd-box .btn-ack    { color: #7ab4d8; border-color: #4a8fc1; }
+  #cmd-box .cmd-feedback {
+    margin-top: 10px; font-size: 10px; font-family: var(--mono);
+    color: var(--text-muted); min-height: 16px; text-align: center;
+  }
+  #cmd-box .cmd-feedback.ok  { color: #5cb870; }
+  #cmd-box .cmd-feedback.err { color: var(--alarm-t); }
+
+  /* Equipment card — show cursor pointer to signal it's clickable */
+  .equip-card { cursor: pointer; }
+  .equip-card:hover { border-color: var(--border2); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ALARM BANNER -->
+  <div id="alarm-banner" class="no-alarms">
+    <span class="label">ALARM</span>
+    <span class="scroll-text" id="banner-text">No active alarms</span>
+  </div>
+
+  <!-- TITLE BAR -->
+  <div id="titlebar">
+    <span class="plant-name">GCT Cement Plant</span>
+    <span class="divider">|</span>
+    <span class="screen-title" id="screen-title-label">Plant Overview</span>
+    <span class="spacer"></span>
+    <div class="conn-indicator" id="conn-dot"></div>
+    <span class="conn-label" id="conn-label">Connecting…</span>
+  </div>
+
+  <!-- BODY -->
+  <div id="body">
+    <!-- SIDEBAR -->
+    <nav id="sidebar">
+      <div class="nav-section">Views</div>
+      <button class="active" data-screen="overview"    onclick="showScreen('overview',this)">Plant Overview</button>
+      <button data-screen="mimic"       onclick="showScreen('mimic',this)">Process Mimic</button>
+      <button data-screen="alarms"      onclick="showScreen('alarms',this)">Alarm Summary</button>
+      <button data-screen="trends"      onclick="showScreen('trends',this)">Trends</button>
+
+      <div class="nav-section">Sections</div>
+      <button data-screen="vrm"         onclick="showScreen('vrm',this)">VRM Section</button>
+      <button data-screen="gct"         onclick="showScreen('gct',this)">GCT / Kiln</button>
+      <button data-screen="kbf"         onclick="showScreen('kbf',this)">Bag Filter</button>
+
+      <div class="nav-section">I/O</div>
+      <button data-screen="analog-io"   onclick="showScreen('analog-io',this)">Analog I/O</button>
+      <button data-screen="digital-io"  onclick="showScreen('digital-io',this)">Digital I/O</button>
+    </nav>
+
+    <!-- CONTENT -->
+    <div id="content">
+
+      <!-- ══ OVERVIEW ══════════════════════════════════════════ -->
+      <div id="screen-overview" class="screen active">
+        <div class="overview-grid" id="overview-groups"></div>
+      </div>
+
+      <!-- ══ PROCESS MIMIC ═════════════════════════════════════ -->
+      <div id="screen-mimic" class="screen">
+        <div class="section-header">Process Flow Mimic — Cement Plant Sections</div>
+        <svg id="mimic-svg" viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg"
+             style="background:#1a1c21; border:1px solid #3a3e4a; font-family:'Segoe UI',Arial,sans-serif;">
+
+          <!-- Process lines -->
+          <!-- Feed → VRM -->
+          <line x1="60" y1="100" x2="180" y2="100" stroke="#4a8fc1" stroke-width="2"/>
+          <!-- VRM → GCT -->
+          <line x1="340" y1="100" x2="420" y2="100" stroke="#4a8fc1" stroke-width="2"/>
+          <!-- GCT inlet hot gas -->
+          <line x1="510" y1="60"  x2="510" y2="100" stroke="#c47a00" stroke-width="2"/>
+          <!-- GCT → KBF -->
+          <line x1="610" y1="100" x2="680" y2="100" stroke="#4a8fc1" stroke-width="2"/>
+          <!-- KBF exhaust up -->
+          <line x1="780" y1="60"  x2="780" y2="100" stroke="#5a5f6e" stroke-width="2"/>
+
+          <!-- Hydraulic line VRM -->
+          <line x1="240" y1="160" x2="240" y2="200" stroke="#6a5a90" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+          <!-- ── VRM block ── -->
+          <rect x="180" y="65" width="160" height="70" fill="#252830" stroke="#3a3e4a" stroke-width="1.5"/>
+          <text x="260" y="88"  text-anchor="middle" fill="#7b8299" font-size="8" font-weight="600" letter-spacing="1">VERTICAL ROLLER MILL</text>
+          <circle cx="230" cy="107" r="14" fill="#1e2025" stroke="#3a3e4a" stroke-width="1.5"/>
+          <text x="230" y="111" text-anchor="middle" fill="#7b8299" font-size="8">M</text>
+          <!-- Rollers -->
+          <ellipse cx="255" cy="107" rx="8"  ry="12" fill="#2d3038" stroke="#484d5c" stroke-width="1"/>
+          <ellipse cx="280" cy="107" rx="8"  ry="12" fill="#2d3038" stroke="#484d5c" stroke-width="1"/>
+          <text x="260" y="125" text-anchor="middle" fill="#4a8fc1" font-size="7" id="mimic-vrm-status">STOPPED</text>
+
+          <!-- VRM instruments -->
+          <rect x="185" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="188" y="155" fill="#7b8299" font-size="7">TT-030</text>
+          <text x="188" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-vrm-tt030">---</text>
+
+          <rect x="230" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="233" y="155" fill="#7b8299" font-size="7">PT-060</text>
+          <text x="233" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-vrm-pt060">---</text>
+
+          <rect x="275" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="278" y="155" fill="#7b8299" font-size="7">VT-040</text>
+          <text x="278" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-vrm-vt040">---</text>
+
+          <!-- ── GCT / Kiln block ── -->
+          <rect x="420" y="65" width="190" height="70" fill="#252830" stroke="#3a3e4a" stroke-width="1.5"/>
+          <text x="515" y="82"  text-anchor="middle" fill="#7b8299" font-size="8" font-weight="600" letter-spacing="1">GAS CONDITIONING / KILN</text>
+          <!-- spray nozzles -->
+          <line x1="460" y1="95" x2="460" y2="110" stroke="#4a8fc1" stroke-width="1" stroke-dasharray="2,2"/>
+          <line x1="490" y1="95" x2="490" y2="110" stroke="#4a8fc1" stroke-width="1" stroke-dasharray="2,2"/>
+          <line x1="520" y1="95" x2="520" y2="110" stroke="#4a8fc1" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="515" y="125" text-anchor="middle" fill="#4a8fc1" font-size="7" id="mimic-gct-status">STOPPED</text>
+
+          <!-- GCT instruments -->
+          <rect x="425" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="428" y="155" fill="#7b8299" font-size="7">TT-102</text>
+          <text x="428" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-gct-tt102">---</text>
+
+          <rect x="468" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="471" y="155" fill="#7b8299" font-size="7">FT-201</text>
+          <text x="471" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-gct-ft201">---</text>
+
+          <rect x="511" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="514" y="155" fill="#7b8299" font-size="7">FT-202</text>
+          <text x="514" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-gct-ft202">---</text>
+
+          <!-- Kiln drum -->
+          <ellipse cx="580" cy="100" rx="20" ry="10" fill="#1e2025" stroke="#484d5c" stroke-width="1.5"/>
+          <text x="580" y="104" text-anchor="middle" fill="#7b8299" font-size="7">KLN</text>
+
+          <!-- Hot gas inlet label -->
+          <text x="510" y="56"  text-anchor="middle" fill="#c47a00" font-size="7">HOT GAS</text>
+
+          <!-- ── Bag Filter block ── -->
+          <rect x="680" y="65" width="120" height="70" fill="#252830" stroke="#3a3e4a" stroke-width="1.5"/>
+          <text x="740" y="82"  text-anchor="middle" fill="#7b8299" font-size="8" font-weight="600" letter-spacing="1">BAG FILTER</text>
+          <!-- bag rows -->
+          <rect x="695" y="92" width="6" height="28" fill="#2d3038" stroke="#484d5c"/>
+          <rect x="705" y="92" width="6" height="28" fill="#2d3038" stroke="#484d5c"/>
+          <rect x="715" y="92" width="6" height="28" fill="#2d3038" stroke="#484d5c"/>
+          <rect x="755" y="92" width="6" height="28" fill="#2d3038" stroke="#484d5c"/>
+          <rect x="765" y="92" width="6" height="28" fill="#2d3038" stroke="#484d5c"/>
+          <text x="740" y="125" text-anchor="middle" fill="#4a8fc1" font-size="7" id="mimic-kbf-status">STOPPED</text>
+
+          <!-- ID Fan -->
+          <circle cx="810" cy="100" r="14" fill="#1e2025" stroke="#3a3e4a" stroke-width="1.5"/>
+          <text x="810" y="103" text-anchor="middle" fill="#7b8299" font-size="7">ID FAN</text>
+          <line x1="800" y1="100" x2="820" y2="100" stroke="#7b8299" stroke-width="0.8"/>
+          <line x1="810" y1="90"  x2="810" y2="110" stroke="#7b8299" stroke-width="0.8"/>
+
+          <!-- KBF instruments -->
+          <rect x="685" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="688" y="155" fill="#7b8299" font-size="7">DP-800</text>
+          <text x="688" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-kbf-dp800">---</text>
+
+          <rect x="728" y="145" width="36" height="18" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="731" y="155" fill="#7b8299" font-size="7">TT-803</text>
+          <text x="731" y="163" fill="#d4d8e2" font-size="8" font-weight="600" id="mimic-kbf-tt803">---</text>
+
+          <!-- Feed hopper -->
+          <polygon points="30,80 60,80 50,120 40,120" fill="#2d3038" stroke="#484d5c"/>
+          <text x="45" y="108" text-anchor="middle" fill="#7b8299" font-size="7">FEED</text>
+
+          <!-- Exhaust stack -->
+          <rect x="772" y="20" width="16" height="40" fill="#2d3038" stroke="#484d5c"/>
+          <text x="780" y="15" text-anchor="middle" fill="#5a5f6e" font-size="7">STACK</text>
+
+          <!-- Legend -->
+          <rect x="20" y="320" width="220" height="76" fill="#1e2025" stroke="#3a3e4a"/>
+          <text x="28" y="334" fill="#7b8299" font-size="8" font-weight="700" letter-spacing="1">LEGEND</text>
+          <line x1="28" y1="340" x2="60" y2="340" stroke="#4a8fc1" stroke-width="2"/>
+          <text x="64" y="344" fill="#7b8299" font-size="7">Process pipe</text>
+          <line x1="28" y1="354" x2="60" y2="354" stroke="#c47a00" stroke-width="2"/>
+          <text x="64" y="358" fill="#7b8299" font-size="7">Hot gas</text>
+          <line x1="28" y1="368" x2="60" y2="368" stroke="#6a5a90" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <text x="64" y="372" fill="#7b8299" font-size="7">Hydraulic</text>
+          <rect x="28" y="375" width="8" height="8" fill="#3d8b50"/>
+          <text x="40" y="383" fill="#7b8299" font-size="7">Running</text>
+          <rect x="80" y="375" width="8" height="8" fill="#5a5f6e"/>
+          <text x="92" y="383" fill="#7b8299" font-size="7">Stopped</text>
+          <rect x="130" y="375" width="8" height="8" fill="#b84a2a"/>
+          <text x="142" y="383" fill="#7b8299" font-size="7">Tripped/Alarm</text>
+        </svg>
+      </div>
+
+      <!-- ══ ALARM SUMMARY ══════════════════════════════════════ -->
+      <div id="screen-alarms" class="screen">
+        <div class="section-header">Active Alarm Summary</div>
+        <div id="alarm-count-line" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;"></div>
+        <table class="alarm-list">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Tag ID</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody id="alarm-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- ══ TRENDS ═════════════════════════════════════════════ -->
+      <div id="screen-trends" class="screen">
+        <div class="section-header">Process Variable Trends (last 120 s)</div>
+        <div class="trend-row" id="trend-container"></div>
+      </div>
+
+      <!-- ══ VRM SECTION ════════════════════════════════════════ -->
+      <div id="screen-vrm" class="screen">
+        <div class="section-header">Vertical Roller Mill (VRM) — Section Detail</div>
+        <div class="panel-row">
+          <div class="panel">
+            <div class="panel-title">Analog Instruments</div>
+            <table class="analog-table" id="vrm-analog-table">
+              <thead><tr><th>Tag</th><th>Description</th><th>Value</th><th>Unit</th><th style="width:100px">Range</th><th>L1/L2</th><th>H1/H2</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel-row">
+          <div class="panel">
+            <div class="panel-title">Drive & Equipment Status</div>
+            <div class="equip-grid" id="vrm-equip-grid"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Digital I/O — VRM</div>
+            <table class="digital-table" id="vrm-digital-table">
+              <thead><tr><th>Tag</th><th>Description</th><th>State</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ GCT SECTION ════════════════════════════════════════ -->
+      <div id="screen-gct" class="screen">
+        <div class="section-header">Gas Conditioning Tower (GCT) / Kiln — Section Detail</div>
+        <div class="panel-row">
+          <div class="panel">
+            <div class="panel-title">Analog Instruments</div>
+            <table class="analog-table" id="gct-analog-table">
+              <thead><tr><th>Tag</th><th>Description</th><th>Value</th><th>Unit</th><th style="width:100px">Range</th><th>L1/L2</th><th>H1/H2</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel-row">
+          <div class="panel">
+            <div class="panel-title">Drive & Equipment Status</div>
+            <div class="equip-grid" id="gct-equip-grid"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Digital I/O — GCT / Kiln</div>
+            <table class="digital-table" id="gct-digital-table">
+              <thead><tr><th>Tag</th><th>Description</th><th>State</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ BAG FILTER SECTION ═════════════════════════════════ -->
+      <div id="screen-kbf" class="screen">
+        <div class="section-header">Bag Filter (KBF) — Section Detail</div>
+        <div class="panel-row">
+          <div class="panel">
+            <div class="panel-title">Analog Instruments</div>
+            <table class="analog-table" id="kbf-analog-table">
+              <thead><tr><th>Tag</th><th>Description</th><th>Value</th><th>Unit</th><th style="width:100px">Range</th><th>L1/L2</th><th>H1/H2</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel-row">
+          <div class="panel">
+            <div class="panel-title">Drive & Equipment Status</div>
+            <div class="equip-grid" id="kbf-equip-grid"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Digital I/O — Bag Filter</div>
+            <table class="digital-table" id="kbf-digital-table">
+              <thead><tr><th>Tag</th><th>Description</th><th>State</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ ALL ANALOG I/O ═════════════════════════════════════ -->
+      <div id="screen-analog-io" class="screen">
+        <div class="section-header">All Analog Inputs / Calculated Values</div>
+        <table class="analog-table" id="all-analog-table">
+          <thead><tr><th>Tag</th><th>Description</th><th>Value</th><th>Unit</th><th style="width:100px">Range</th><th>L1/L2</th><th>H1/H2</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- ══ ALL DIGITAL I/O ════════════════════════════════════ -->
+      <div id="screen-digital-io" class="screen">
+        <div class="section-header">All Digital Inputs / Outputs</div>
+        <table class="digital-table" id="all-digital-table">
+          <thead><tr><th>Tag</th><th>Description</th><th>State</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /body -->
+
+  <!-- STATUS BAR -->
+  <div id="statusbar">
+    <span id="sb-time">--:--:--</span>
+    <span class="sep">|</span>
+    <span>SCAN: <span id="sb-scan">-- ms</span></span>
+    <span class="sep">|</span>
+    <span>ALARMS: <span id="sb-alarms">0</span></span>
+    <span class="sep">|</span>
+    <span>DB: GCT-SCADA</span>
+    <span class="sep">|</span>
+    <span>WS: <span id="sb-ws">ws/tags</span></span>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ANALOG FACEPLATE MODAL -->
+<div id="faceplate-modal" onclick="closeFaceplate(event)">
+  <div id="faceplate-box">
+    <div class="fp-title">
+      <span>Instrument Faceplate</span>
+      <span class="fp-close" onclick="document.getElementById('faceplate-modal').classList.remove('open')">✕</span>
+    </div>
+    <div class="fp-tag" id="fp-tag">—</div>
+    <div class="fp-desc" id="fp-desc">—</div>
+    <div>
+      <span class="fp-val" id="fp-val">—</span>
+      <span class="fp-unit" id="fp-unit">—</span>
+    </div>
+    <div class="fp-limits" id="fp-limits"></div>
+  </div>
+</div>
+
+<!-- EQUIPMENT COMMAND MODAL -->
+<div id="cmd-modal" onclick="closeCmdModal(event)">
+  <div id="cmd-box">
+    <div class="cmd-title">
+      <span>Equipment Control</span>
+      <span class="cmd-close" onclick="document.getElementById('cmd-modal').classList.remove('open')">✕</span>
+    </div>
+    <div class="cmd-tag"  id="cmd-tag">—</div>
+    <div class="cmd-desc" id="cmd-desc">—</div>
+    <div class="cmd-status-row">
+      <div class="cmd-status-dot" id="cmd-status-dot"></div>
+      <span class="cmd-status-text" id="cmd-status-text">—</span>
+    </div>
+    <div class="cmd-buttons">
+      <button class="cmd-btn btn-start" id="cmd-btn-start">▶  Start</button>
+      <button class="cmd-btn btn-stop"  id="cmd-btn-stop" >■  Stop</button>
+      <button class="cmd-btn btn-reset" id="cmd-btn-reset">↺  Reset</button>
+      <button class="cmd-btn btn-ack"   id="cmd-btn-ack"  >✔  Ack Alarm</button>
+    </div>
+    <div class="cmd-feedback" id="cmd-feedback"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+const state = {
+  analog:  {},   // tag_id → row
+  digital: {},   // tag_id → row
+  equip:   {},   // tag_id → row
+  alarms:  [],   // active alarm records
+  lastScanMs: null,
+  lastScanTime: null,
+};
+
+// Trend history: tag_id → [values] (max 120 points)
+const TREND_TAGS = [
+  'VRM-TT-030','VRM-PT-060','VRM-VT-040',
+  'GCT-TT-102','GCT-FT-201','GCT-FT-202',
+  'KBF-DP-800','KBF-TT-803','KBF-PT-804',
+];
+const trendHistory = {};
+TREND_TAGS.forEach(t => trendHistory[t] = []);
+const TREND_MAX = 120;
+
+// Section tag maps
+const SECTIONS = {
+  vrm: {
+    prefix: ['VRM'],
+    analog:  ['VRM-TT-030','VRM-TT-031','VRM-VT-040','VRM-VT-041','VRM-VT-042','VRM-PT-060'],
+    digital: ['VRM-MD-010','VRM-MD-010-XS','VRM-MD-010-XF',
+              'VRM-MD-020','VRM-MD-020-XS','VRM-MD-020-XF',
+              'VRM-MD-070','VRM-MD-070-XS','VRM-MD-070-XF',
+              'VRM-LSH-080','VRM-LSL-081',
+              'VRM-LS-50-ZSU','VRM-LS-51-ZSU','VRM-LS-52-ZSU','VRM-LS-53-ZSU',
+              'VRM-LS-50-ZSD','VRM-LS-51-ZSD','VRM-LS-52-ZSD','VRM-LS-53-ZSD'],
+    equip:   ['VRM-MD-010','VRM-MD-010-XS','VRM-MD-010-XF',
+              'VRM-MD-020','VRM-MD-020-XS','VRM-MD-020-XF',
+              'VRM-MD-070','VRM-MD-070-XS','VRM-MD-070-XF'],
+  },
+  gct: {
+    prefix: ['GCT','KLN'],
+    analog:  ['GCT-TT-101','GCT-TT-102','GCT-FT-201','GCT-FT-202'],
+    digital: ['GCT-LSH-301','GCT-LSH-302',
+              'GCT-MP-601','GCT-MP-601-XS','GCT-MP-601-XF',
+              'KLN-KD-701','KLN-KD-701-XS','KLN-KD-701-XF',
+              'KLN-BG-702','KLN-BG-702-XS','KLN-BG-702-XF'],
+    equip:   ['GCT-MP-601','GCT-MP-601-XS','GCT-MP-601-XF',
+              'KLN-KD-701','KLN-KD-701-XS','KLN-KD-701-XF',
+              'KLN-BG-702','KLN-BG-702-XS','KLN-BG-702-XF',
+              'KLN-XS-001','KLN-XS-002'],
+  },
+  kbf: {
+    prefix: ['KBF'],
+    analog:  ['KBF-DP-800','KBF-VT-802','KBF-TT-803','KBF-PT-804'],
+    digital: ['KBF-MD-801','KBF-MD-801-XS','KBF-MD-801-XF','KBF-CS-805'],
+    equip:   ['KBF-MD-801','KBF-MD-801-XS','KBF-MD-801-XF','KBF-CS-805'],
+  },
+};
+
+// Description lookup from equipments table
+function desc(tagId) {
+  return state.equip[tagId] ? state.equip[tagId].equip_description : tagId;
+}
+
+// ══════════════════════════════════════════════════════════
+// WEBSOCKET
+// ══════════════════════════════════════════════════════════
+let ws, reconnectTimer;
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/tags`);
+
+  ws.onopen = () => {
+    document.getElementById('conn-dot').classList.add('connected');
+    document.getElementById('conn-label').textContent = 'Connected';
+    document.getElementById('sb-ws').textContent = 'CONNECTED';
+    clearTimeout(reconnectTimer);
+  };
+
+  ws.onclose = () => {
+    document.getElementById('conn-dot').classList.remove('connected');
+    document.getElementById('conn-label').textContent = 'Reconnecting…';
+    document.getElementById('sb-ws').textContent = 'RECONNECTING';
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+
+  ws.onmessage = (evt) => {
+    const t0 = performance.now();
+    const data = JSON.parse(evt.data);
+
+    // Update state
+    (data.analog_tags  || []).forEach(r => state.analog[r.tag_id]  = r);
+    (data.digital_tags || []).forEach(r => state.digital[r.tag_id] = r);
+    (data.equipments   || []).forEach(r => state.equip[r.tag_id]   = r);
+    state.alarms = data.active_alarms || [];
+
+    // Update trend history
+    TREND_TAGS.forEach(t => {
+      if (state.analog[t]) {
+        const h = trendHistory[t];
+        h.push(state.analog[t].process_val);
+        if (h.length > TREND_MAX) h.shift();
+      }
+    });
+
+    const scanMs = Math.round(performance.now() - t0);
+    state.lastScanMs = scanMs;
+    state.lastScanTime = new Date();
+
+    render();
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+// SCREEN NAVIGATION
+// ══════════════════════════════════════════════════════════
+const SCREEN_TITLES = {
+  overview: 'Plant Overview', mimic: 'Process Mimic',
+  alarms: 'Alarm Summary', trends: 'Trends',
+  vrm: 'VRM Section', gct: 'GCT / Kiln Section', kbf: 'Bag Filter Section',
+  'analog-io': 'All Analog I/O', 'digital-io': 'All Digital I/O',
+};
+let currentScreen = 'overview';
+
+function showScreen(id, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  document.querySelectorAll('#sidebar button').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  currentScreen = id;
+  document.getElementById('screen-title-label').textContent = SCREEN_TITLES[id] || id;
+  renderCurrentScreen();
+}
+
+// ══════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ══════════════════════════════════════════════════════════
+function statusClass(s) {
+  if (!s) return 's-unknown';
+  return 's-' + s.toLowerCase();
+}
+
+function alarmClass(row) {
+  if (!row) return '';
+  const v = row.process_val, l1 = row.l1_val, l2 = row.l2_val, h1 = row.h1_val, h2 = row.h2_val;
+  if (v === null) return '';
+  if (h2 !== null && v >= h2) return 'row-h2';
+  if (h1 !== null && v >= h1) return 'row-h1';
+  if (l2 !== null && v <= l2) return 'row-l2';
+  if (l1 !== null && v <= l1) return 'row-l1';
+  return '';
+}
+
+function barClass(row) {
+  const c = alarmClass(row);
+  if (c === 'row-h2' || c === 'row-l2') return 'fill-h2';
+  if (c === 'row-h1' || c === 'row-l1') return 'fill-h1';
+  return '';
+}
+
+function barPct(row) {
+  if (!row || row.process_val === null) return 0;
+  const v = row.process_val;
+  // Use alarm limits to define range; fallback to sensor data range
+  const lo = row.l2_val !== null ? (row.l2_val * 0.5) : 0;
+  const hi = row.h2_val !== null ? (row.h2_val * 1.1) : (v * 2 || 100);
+  if (hi <= lo) return 50;
+  return Math.min(100, Math.max(0, ((v - lo) / (hi - lo)) * 100));
+}
+
+function fmt(v) {
+  if (v === null || v === undefined) return '---';
+  return typeof v === 'number' ? v.toFixed(2) : v;
+}
+
+function fmtLim(v) { return v !== null && v !== undefined ? v : '—'; }
+
+function buildAnalogRow(tagId) {
+  const row = state.analog[tagId];
+  const eq  = state.equip[tagId];
+  if (!row) return '';
+  const ac = alarmClass(row);
+  const bc = barClass(row);
+  const pct = barPct(row);
+  return `<tr class="${ac}" onclick="openFaceplate('${tagId}')" style="cursor:pointer">
+    <td class="tag-col">${tagId}</td>
+    <td>${eq ? eq.equip_description : ''}</td>
+    <td class="val-col">${fmt(row.process_val)}</td>
+    <td class="unit-col">${row.param_unit || ''}</td>
+    <td class="bar-col"><div class="bar-gauge"><div class="bar-fill ${bc}" style="width:${pct}%"></div></div></td>
+    <td class="limit-col">${fmtLim(row.l1_val)} / ${fmtLim(row.l2_val)}</td>
+    <td class="limit-col">${fmtLim(row.h1_val)} / ${fmtLim(row.h2_val)}</td>
+  </tr>`;
+}
+
+function buildDigitalRow(tagId) {
+  const row = state.digital[tagId];
+  const eq  = state.equip[tagId];
+  if (!row && !eq) return '';
+  const state_ = row ? row.binary_state : false;
+  const isFault = tagId.endsWith('-XF');
+  let dotClass = state_ ? (isFault ? 'dot-fault' : 'dot-on') : 'dot-off';
+  const label  = state_ ? (isFault ? 'FAULT' : 'ON') : 'OFF';
+  return `<tr>
+    <td class="tag-col">${tagId}</td>
+    <td>${eq ? eq.equip_description : ''}</td>
+    <td><span class="dot ${dotClass}"></span>${label}</td>
+  </tr>`;
+}
+
+function buildEquipCard(tagId) {
+  const eq = state.equip[tagId];
+  if (!eq) return '';
+  const sc = statusClass(eq.status);
+  return `<div class="equip-card ${sc}" onclick="openCmdFaceplate('${tagId}')">
+    <div class="status-bar"></div>
+    <div style="padding-left:8px">
+      <div class="tag">${tagId}</div>
+      <div class="desc">${eq.equip_description}</div>
+      <div class="status-label">${eq.status || 'UNKNOWN'}</div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// RENDER SCREENS
+// ══════════════════════════════════════════════════════════
+function render() {
+  renderStatusBar();
+  renderAlarmBanner();
+  renderCurrentScreen();
+}
+
+function renderCurrentScreen() {
+  switch (currentScreen) {
+    case 'overview':    renderOverview();   break;
+    case 'mimic':       renderMimic();      break;
+    case 'alarms':      renderAlarms();     break;
+    case 'trends':      renderTrends();     break;
+    case 'vrm':         renderSection('vrm'); break;
+    case 'gct':         renderSection('gct'); break;
+    case 'kbf':         renderSection('kbf'); break;
+    case 'analog-io':   renderAllAnalog();  break;
+    case 'digital-io':  renderAllDigital(); break;
+  }
+}
+
+function renderStatusBar() {
+  const now = new Date();
+  document.getElementById('sb-time').textContent = now.toLocaleTimeString('en-GB');
+  if (state.lastScanMs !== null)
+    document.getElementById('sb-scan').textContent = state.lastScanMs + ' ms';
+  document.getElementById('sb-alarms').textContent = state.alarms.length;
+}
+
+function renderAlarmBanner() {
+  const banner = document.getElementById('alarm-banner');
+  const txt    = document.getElementById('banner-text');
+  if (state.alarms.length === 0) {
+    banner.className = 'no-alarms';
+    txt.textContent = 'No active alarms';
+  } else {
+    banner.className = 'has-alarms';
+    const msgs = state.alarms.slice(0,5).map(a => `[${a.alarm_type}] ${a.tag_id} — ${a.alarm_descr}`);
+    txt.textContent = msgs.join('   ·   ');
+  }
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────
+const OVERVIEW_DEF = [
+  {
+    title: 'VRM — Main Drive',
+    equip: ['VRM-MD-010-XS'],
+    analog: ['VRM-TT-030','VRM-VT-040','VRM-PT-060'],
+  },
+  {
+    title: 'VRM — Separator & Hydraulics',
+    equip: ['VRM-MD-020-XS','VRM-MD-070-XS'],
+    analog: ['VRM-TT-031','VRM-VT-041','VRM-VT-042'],
+  },
+  {
+    title: 'GCT — Gas Conditioning Tower',
+    equip: ['GCT-MP-601-XS'],
+    analog: ['GCT-TT-101','GCT-TT-102','GCT-FT-202'],
+  },
+  {
+    title: 'Kiln — Drive & Group',
+    equip: ['KLN-KD-701-XS','KLN-BG-702-XS'],
+    analog: ['GCT-FT-201'],
+  },
+  {
+    title: 'Bag Filter — ID Fan',
+    equip: ['KBF-MD-801-XS'],
+    analog: ['KBF-DP-800','KBF-TT-803','KBF-PT-804'],
+  },
+  {
+    title: 'Digital / Group Status',
+    equip: ['KLN-XS-001'],
+    digital: ['VRM-LSH-080','VRM-LSL-081','GCT-LSH-301','KBF-CS-805'],
+    analog: [],
+  },
+];
+
+function renderOverview() {
+  const el = document.getElementById('overview-groups');
+  el.innerHTML = OVERVIEW_DEF.map(group => {
+    // group status = worst of all equip statuses
+    const statuses = (group.equip || []).map(id => state.equip[id] ? state.equip[id].status : 'UNKNOWN');
+    let gs = 'UNKNOWN';
+    if (statuses.some(s => s === 'ALARM'))   gs = 'ALARM';
+    else if (statuses.some(s => s === 'TRIPPED')) gs = 'TRIPPED';
+    else if (statuses.every(s => s === 'RUNNING')) gs = 'RUNNING';
+    else if (statuses.some(s => s === 'STOPPED')) gs = 'STOPPED';
+
+    const gsColor = { RUNNING: 'var(--running-t)', STOPPED: 'var(--stopped-t)',
+                      TRIPPED: 'var(--tripped-t)', ALARM:   'var(--alarm-t)',
+                      UNKNOWN: 'var(--text-dim)' }[gs] || 'var(--text-dim)';
+
+    const equipItems = (group.equip || []).map(id => {
+      const eq = state.equip[id];
+      if (!eq) return '';
+      const sc = statusClass(eq.status);
+      return `<div class="overview-item">
+        <span class="oi-tag">${id}</span>
+        <span class="oi-val ${eq.status === 'RUNNING' ? 'v-normal' : eq.status === 'ALARM' || eq.status === 'TRIPPED' ? 'v-alarm' : ''}">${eq.status || '—'}</span>
+      </div>`;
+    }).join('');
+
+    const analogItems = (group.analog || []).map(id => {
+      const r = state.analog[id];
+      if (!r) return '';
+      const ac = alarmClass(r);
+      const cls = ac.includes('h2') || ac.includes('l2') ? 'v-alarm' : ac.includes('h1') || ac.includes('l1') ? 'v-warn' : 'v-normal';
+      return `<div class="overview-item">
+        <span class="oi-tag">${id}</span>
+        <span class="oi-val ${cls}">${fmt(r.process_val)} <span style="font-size:9px;color:var(--text-muted)">${r.param_unit || ''}</span></span>
+      </div>`;
+    }).join('');
+
+    const digitalItems = (group.digital || []).map(id => {
+      const r = state.digital[id];
+      if (!r) return '';
+      const on = r.binary_state;
+      const isFault = id.endsWith('-XF');
+      const dot = on ? (isFault ? 'dot-fault' : 'dot-on') : 'dot-off';
+      return `<div class="overview-item">
+        <span class="oi-tag">${id}</span>
+        <span class="oi-val"><span class="dot ${dot}"></span>${on ? (isFault ? 'FAULT' : 'ON') : 'OFF'}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="overview-group">
+      <div class="group-title">${group.title}</div>
+      <div class="group-status" style="color:${gsColor}">${gs}</div>
+      ${equipItems}${analogItems}${digitalItems}
+    </div>`;
+  }).join('');
+}
+
+// ── MIMIC ─────────────────────────────────────────────────
+function mimicStatusColor(tagId) {
+  const eq = state.equip[tagId];
+  if (!eq) return '#5a5f6e';
+  return { RUNNING:'#3d8b50', STOPPED:'#5a5f6e', TRIPPED:'#b84a2a', ALARM:'#c0392b', UNKNOWN:'#5a5f6e' }[eq.status] || '#5a5f6e';
+}
+
+function setMimicText(id, tagId) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const r = state.analog[tagId];
+  if (r) el.textContent = fmt(r.process_val);
+}
+
+function setMimicStatus(id, tagId) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const eq = state.equip[tagId];
+  if (!eq) return;
+  el.textContent = eq.status || 'UNKNOWN';
+  el.setAttribute('fill', mimicStatusColor(tagId));
+}
+
+function renderMimic() {
+  setMimicStatus('mimic-vrm-status', 'VRM-MD-010-XS');
+  setMimicStatus('mimic-gct-status', 'KLN-KD-701-XS');
+  setMimicStatus('mimic-kbf-status', 'KBF-MD-801-XS');
+  setMimicText('mimic-vrm-tt030', 'VRM-TT-030');
+  setMimicText('mimic-vrm-pt060', 'VRM-PT-060');
+  setMimicText('mimic-vrm-vt040', 'VRM-VT-040');
+  setMimicText('mimic-gct-tt102', 'GCT-TT-102');
+  setMimicText('mimic-gct-ft201', 'GCT-FT-201');
+  setMimicText('mimic-gct-ft202', 'GCT-FT-202');
+  setMimicText('mimic-kbf-dp800', 'KBF-DP-800');
+  setMimicText('mimic-kbf-tt803', 'KBF-TT-803');
+}
+
+// ── ALARMS ────────────────────────────────────────────────
+function renderAlarms() {
+  const tbody = document.getElementById('alarm-tbody');
+  const count = document.getElementById('alarm-count-line');
+  if (state.alarms.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="no-alarms-msg">No active alarms</td></tr>';
+    count.textContent = '';
+    return;
+  }
+  count.textContent = `${state.alarms.length} active alarm(s)`;
+  tbody.innerHTML = state.alarms.map(a => {
+    const tc = (a.alarm_type || '').toLowerCase();
+    const cls = `alarm-type-${tc}`;
+    const ts = a.time_stamp ? a.time_stamp.replace('T',' ').slice(0,19) : '—';
+    return `<tr>
+      <td class="ts-col">${ts}</td>
+      <td class="tag-col">${a.tag_id}</td>
+      <td class="${cls}">${a.alarm_type || '—'}</td>
+      <td>${a.alarm_descr || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── TRENDS ────────────────────────────────────────────────
+let trendCanvases = {};
+
+function renderTrends() {
+  const container = document.getElementById('trend-container');
+  // Build boxes if not already built
+  if (!container.hasChildNodes()) {
+    TREND_TAGS.forEach(tag => {
+      const box = document.createElement('div');
+      box.className = 'trend-box';
+      box.innerHTML = `<div class="trend-title">
+          <span>${tag}</span>
+          <span class="trend-val" id="tv-${tag.replace(/[-]/g,'_')}">—</span>
+          <span class="trend-unit" id="tu-${tag.replace(/[-]/g,'_')}"></span>
+        </div>
+        <canvas class="sparkline" id="tc-${tag.replace(/[-]/g,'_')}" width="280" height="48"></canvas>`;
+      container.appendChild(box);
+    });
+  }
+  TREND_TAGS.forEach(tag => {
+    const safeId = tag.replace(/[-]/g,'_');
+    const r = state.analog[tag];
+    const valEl  = document.getElementById('tv-' + safeId);
+    const unitEl = document.getElementById('tu-' + safeId);
+    const canvas = document.getElementById('tc-' + safeId);
+    if (!r || !canvas) return;
+    if (valEl) valEl.textContent = fmt(r.process_val);
+    if (unitEl) unitEl.textContent = r.param_unit || '';
+    drawSparkline(canvas, trendHistory[tag], r.h1_val, r.h2_val, r.l1_val, r.l2_val);
+  });
+}
+
+function drawSparkline(canvas, data, h1, h2, l1, l2) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || canvas.width;
+  const H = canvas.height;
+  canvas.width = W;
+  ctx.clearRect(0, 0, W, H);
+  if (data.length < 2) return;
+
+  let mn = Math.min(...data), mx = Math.max(...data);
+  if (mn === mx) { mn -= 1; mx += 1; }
+  const padLo = (mx - mn) * 0.1, padHi = (mx - mn) * 0.1;
+  const lo = mn - padLo, hi = mx + padHi;
+  const scaleY = v => H - ((v - lo) / (hi - lo)) * H;
+
+  // Draw limit lines
+  function drawHline(val, color) {
+    if (val === null || val === undefined) return;
+    const y = scaleY(val);
+    if (y < 0 || y > H) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  drawHline(h2, '#b03020');
+  drawHline(h1, '#b8860b');
+  drawHline(l2, '#b03020');
+  drawHline(l1, '#b8860b');
+
+  // Draw trace
+  ctx.strokeStyle = '#4a8fc1';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const y = scaleY(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Fill under
+  ctx.fillStyle = 'rgba(74,143,193,0.08)';
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const y = scaleY(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+}
+
+// ── SECTION SCREENS ───────────────────────────────────────
+function renderSection(sec) {
+  const cfg = SECTIONS[sec];
+
+  // Analog table
+  const atEl = document.getElementById(`${sec}-analog-table`);
+  if (atEl) {
+    atEl.querySelector('tbody').innerHTML = cfg.analog
+      .filter(id => state.analog[id])
+      .map(buildAnalogRow).join('');
+  }
+
+  // Equipment cards
+  const egEl = document.getElementById(`${sec}-equip-grid`);
+  if (egEl) {
+    egEl.innerHTML = cfg.equip
+      .filter(id => state.equip[id])
+      .map(buildEquipCard).join('');
+  }
+
+  // Digital table
+  const dtEl = document.getElementById(`${sec}-digital-table`);
+  if (dtEl) {
+    dtEl.querySelector('tbody').innerHTML = cfg.digital
+      .filter(id => state.digital[id] || state.equip[id])
+      .map(buildDigitalRow).join('');
+  }
+}
+
+// ── ALL ANALOG ────────────────────────────────────────────
+function renderAllAnalog() {
+  const tbody = document.querySelector('#all-analog-table tbody');
+  tbody.innerHTML = Object.keys(state.analog)
+    .sort()
+    .map(buildAnalogRow).join('');
+}
+
+// ── ALL DIGITAL ───────────────────────────────────────────
+function renderAllDigital() {
+  const tbody = document.querySelector('#all-digital-table tbody');
+  tbody.innerHTML = Object.keys(state.digital)
+    .sort()
+    .map(buildDigitalRow).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// FACEPLATE
+// ══════════════════════════════════════════════════════════
+function openFaceplate(tagId) {
+  const r  = state.analog[tagId];
+  const eq = state.equip[tagId];
+  if (!r) return;
+  document.getElementById('fp-tag').textContent  = tagId;
+  document.getElementById('fp-desc').textContent = eq ? eq.equip_description : tagId;
+  document.getElementById('fp-val').textContent  = fmt(r.process_val);
+  document.getElementById('fp-unit').textContent = r.param_unit || '';
+
+  const rows = [
+    ['H2 (Trip High)',  r.h2_val], ['H1 (Alarm High)', r.h1_val],
+    ['Current',        r.process_val],
+    ['L1 (Alarm Low)', r.l1_val], ['L2 (Trip Low)',  r.l2_val],
+  ];
+  document.getElementById('fp-limits').innerHTML = rows.map(([lbl,val]) =>
+    `<div class="fp-limit-row"><span class="lbl">${lbl}</span><span class="val">${fmtLim(val)}</span></div>`
+  ).join('');
+
+  document.getElementById('faceplate-modal').classList.add('open');
+}
+
+function closeFaceplate(e) {
+  if (e.target === document.getElementById('faceplate-modal'))
+    document.getElementById('faceplate-modal').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════════
+// EQUIPMENT COMMAND FACEPLATE
+// ══════════════════════════════════════════════════════════
+const STATUS_DOT_COLOR = {
+  RUNNING: '#3d8b50', STOPPED: '#5a5f6e',
+  TRIPPED: '#b84a2a', ALARM:   '#c0392b', UNKNOWN: '#484d5c',
+};
+const STATUS_TEXT_COLOR = {
+  RUNNING: '#5cb870', STOPPED: '#8a8fa0',
+  TRIPPED: '#e06040', ALARM:   '#e74c3c', UNKNOWN: '#555b6e',
+};
+
+let cmdTagId = null;
+
+function openCmdFaceplate(tagId) {
+  cmdTagId = tagId;
+  const eq = state.equip[tagId];
+  const status = eq ? (eq.status || 'UNKNOWN') : 'UNKNOWN';
+
+  document.getElementById('cmd-tag').textContent  = tagId;
+  document.getElementById('cmd-desc').textContent = eq ? eq.equip_description : tagId;
+
+  const dot  = document.getElementById('cmd-status-dot');
+  const txt  = document.getElementById('cmd-status-text');
+  dot.style.background       = STATUS_DOT_COLOR[status]  || '#484d5c';
+  txt.textContent             = status;
+  txt.style.color             = STATUS_TEXT_COLOR[status] || '#555b6e';
+
+  // Button availability rules (ISA-101: only valid transitions enabled)
+  document.getElementById('cmd-btn-start').disabled = (status === 'RUNNING');
+  document.getElementById('cmd-btn-stop').disabled  = (status === 'STOPPED' || status === 'TRIPPED' || status === 'UNKNOWN');
+  document.getElementById('cmd-btn-reset').disabled = !(status === 'TRIPPED' || status === 'ALARM');
+  document.getElementById('cmd-btn-ack').disabled   = false; // always available
+
+  document.getElementById('cmd-feedback').textContent = '';
+  document.getElementById('cmd-feedback').className   = 'cmd-feedback';
+
+  document.getElementById('cmd-modal').classList.add('open');
+}
+
+function closeCmdModal(e) {
+  if (e.target === document.getElementById('cmd-modal'))
+    document.getElementById('cmd-modal').classList.remove('open');
+}
+
+async function sendCmd(action) {
+  if (!cmdTagId) return;
+  const fb = document.getElementById('cmd-feedback');
+  fb.textContent = `Sending ${action.toUpperCase()}…`;
+  fb.className   = 'cmd-feedback';
+  try {
+    const res  = await fetch(`/cmd/${encodeURIComponent(cmdTagId)}/${action}`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      fb.textContent = `${action.toUpperCase()} OK`;
+      fb.className   = 'cmd-feedback ok';
+    } else {
+      fb.textContent = `Error: ${data.detail || res.statusText}`;
+      fb.className   = 'cmd-feedback err';
+    }
+  } catch (err) {
+    fb.textContent = `Network error`;
+    fb.className   = 'cmd-feedback err';
+  }
+}
+
+// Wire buttons
+document.getElementById('cmd-btn-start').addEventListener('click', () => sendCmd('start'));
+document.getElementById('cmd-btn-stop' ).addEventListener('click', () => sendCmd('stop'));
+document.getElementById('cmd-btn-reset').addEventListener('click', () => sendCmd('reset'));
+document.getElementById('cmd-btn-ack'  ).addEventListener('click', () => sendCmd('ack'));
+
+// ══════════════════════════════════════════════════════════
+// CLOCK — runs independently of WS
+// ══════════════════════════════════════════════════════════
+setInterval(() => {
+  document.getElementById('sb-time').textContent = new Date().toLocaleTimeString('en-GB');
+}, 1000);
+
+// ══════════════════════════════════════════════════════════
+// START
+// ══════════════════════════════════════════════════════════
+connect();
+</script>
+</body>
+</html>
