@@ -1333,54 +1333,148 @@ const STATUS_TEXT_COLOR = {
 let cmdTagId = null;
 
 function openCmdFaceplate(tagId) {
-  cmdTagId = tagId;
-  const eq     = state.equip[tagId];
-  const status = eq ? (eq.status || 'UNKNOWN') : 'UNKNOWN';
-  const ioType = eq ? (eq.io_type || '') : '';
-  // DEBUG — confirms what io_type value is being read from state for each tag
-  console.log('[CMD]', tagId, 'io_type:', ioType, 'manual_override:', eq ? eq.manual_override : undefined);
+    cmdTagId = tagId;
 
-  // Only DO tags (drives, pumps, valves) are commandable.
-  // DI tags (XS running feedback, XF fault feedback, sensors) are read-only.
-  const isCommandable = (ioType === 'DO');
+    // Get equipment
+    const eq = state.equip?.[tagId];
 
-  document.getElementById('cmd-tag').textContent  = tagId;
-  document.getElementById('cmd-desc').textContent = eq ? eq.equip_description : tagId;
+    if (!eq) {
+        console.error(`Equipment '${tagId}' not found.`);
+        return;
+    }
 
-  const dot = document.getElementById('cmd-status-dot');
-  const txt = document.getElementById('cmd-status-text');
-  dot.style.background = STATUS_DOT_COLOR[status]  || '#484d5c';
-  txt.textContent      = status;
-  txt.style.color      = STATUS_TEXT_COLOR[status] || '#555b6e';
+    const status = eq.status || "UNKNOWN";
+    const ioType = eq.io_type || "";
 
-  const btnArea = document.getElementById('cmd-buttons');
+    console.log("[CMD]", tagId, {
+        ioType,
+        status,
+        manualOverride: eq.manual_override
+    });
 
-  if (!isCommandable) {
-    // Read-only — hide all command buttons, show IO type label
-    btnArea.style.display = 'none';
-    document.getElementById('cmd-feedback').textContent = `Read-only  (${ioType || 'DI'})`;
-    document.getElementById('cmd-feedback').className   = 'cmd-feedback';
-  } else {
-    btnArea.style.display = '';
-    const isValve = tagId.includes('-XV-');
+    // -------------------------
+    // Get DOM Elements
+    // -------------------------
+    const modal      = document.getElementById("cmd-modal");
+    const tag        = document.getElementById("cmd-tag");
+    const desc       = document.getElementById("cmd-desc");
+    const dot        = document.getElementById("cmd-status-dot");
+    const statusText = document.getElementById("cmd-status-text");
+    const feedback   = document.getElementById("cmd-feedback");
 
-    // Start / Stop always shown for DO tags
-    document.getElementById('cmd-btn-start').disabled = (status === 'RUNNING');
-    document.getElementById('cmd-btn-stop').disabled  = (status === 'STOPPED' || status === 'UNKNOWN');
+    // Supports either id="cmd-buttons" or class="cmd-buttons"
+    const buttonArea =
+        document.getElementById("cmd-buttons") ||
+        document.querySelector(".cmd-buttons");
 
-    // Reset only meaningful for drives that can trip; hide for valves
-    const resetBtn = document.getElementById('cmd-btn-reset');
-    resetBtn.style.display = isValve ? 'none' : '';
-    resetBtn.disabled      = !(status === 'TRIPPED' || status === 'ALARM');
+    const startBtn = document.getElementById("cmd-btn-start");
+    const stopBtn  = document.getElementById("cmd-btn-stop");
+    const resetBtn = document.getElementById("cmd-btn-reset");
+    const ackBtn   = document.getElementById("cmd-btn-ack");
 
-    // Ack always available for DO tags
-    document.getElementById('cmd-btn-ack').disabled = false;
+    const required = {
+        modal,
+        tag,
+        desc,
+        dot,
+        statusText,
+        feedback,
+        buttonArea,
+        startBtn,
+        stopBtn,
+        resetBtn,
+        ackBtn
+    };
 
-    document.getElementById('cmd-feedback').textContent = '';
-    document.getElementById('cmd-feedback').className   = 'cmd-feedback';
-  }
+    for (const [name, element] of Object.entries(required)) {
+        if (!element) {
+            console.error(`Missing element: ${name}`);
+            return;
+        }
+    }
 
-  document.getElementById('cmd-modal').classList.add('open');
+    // -------------------------
+    // Populate faceplate
+    // -------------------------
+    tag.textContent = tagId;
+    desc.textContent = eq.equip_description || tagId;
+
+    dot.style.background =
+        STATUS_DOT_COLOR[status] || "#484d5c";
+
+    statusText.textContent = status;
+    statusText.style.color =
+        STATUS_TEXT_COLOR[status] || "#9aa0ac";
+
+    feedback.textContent = "";
+    feedback.className = "cmd-feedback";
+
+    // -------------------------
+    // Determine commandability
+    // -------------------------
+    const isCommandable = ioType === "DO";
+
+    if (!isCommandable) {
+
+        buttonArea.style.display = "none";
+
+        feedback.textContent = `Read-only (${ioType || "DI"})`;
+
+        console.log("Opening modal...");
+        console.log({
+            modal,
+            buttonArea,
+            startBtn,
+            stopBtn,
+            resetBtn,
+            ackBtn
+        });
+
+        modal.classList.add("open");
+        return;
+    }
+
+    // -------------------------
+    // Command Buttons
+    // -------------------------
+    buttonArea.style.display = "";
+
+    const isValve =
+        tagId.includes("-XV-") ||
+        tagId.includes("-MOV-") ||
+        tagId.includes("-BV-");
+
+    startBtn.disabled =
+        status === "RUNNING";
+
+    stopBtn.disabled =
+        status === "STOPPED" ||
+        status === "UNKNOWN";
+
+    if (isValve) {
+        resetBtn.style.display = "none";
+    } else {
+        resetBtn.style.display = "";
+        resetBtn.disabled =
+            !(status === "TRIPPED" ||
+              status === "ALARM" ||
+              status === "FAULT");
+    }
+
+    ackBtn.disabled = false;
+
+    // -------------------------
+    // Manual Override Indicator
+    // -------------------------
+    if (eq.manual_override) {
+        feedback.textContent = "⚠ Manual Override Active";
+        feedback.className = "cmd-feedback warn";
+    }
+
+    // -------------------------
+    // Show Modal
+    // -------------------------
+    modal.classList.add("open");
 }
 
 function closeCmdModal(e) {
@@ -1392,6 +1486,13 @@ function closeCmdModal(e) {
 }
 
 async function sendCmd(action) {
+    console.log("sendCmd()", action, cmdTagId);
+
+    if (!cmdTagId) {
+        console.error("cmdTagId is null");
+        return;
+    }
+
   if (!cmdTagId) return;
   const fb = document.getElementById('cmd-feedback');
   fb.textContent = `Sending ${action.toUpperCase()}…`;
@@ -1431,53 +1532,5 @@ setInterval(() => {
 // ══════════════════════════════════════════════════════════
 connect();
 </script>
-<!-- COMMAND MODAL — Bob's openCmdFaceplate() JS references these IDs -->
-<div id="cmd-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
-  <div style="background:#252830; border:1px solid #484d5c; width:320px; padding:16px; font-family:'Segoe UI',Arial,sans-serif;">
-
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #3a3e4a; padding-bottom:8px; margin-bottom:10px;">
-      <span style="font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:#7b8299;">Equipment Command</span>
-      <span style="cursor:pointer; color:#7b8299; font-size:14px;" onclick="closeCmdModal()">✕</span>
-    </div>
-
-    <div id="cmd-tag" style="font-family:Consolas,monospace; font-size:16px; color:#d4d8e2; margin-bottom:2px;">—</div>
-    <div id="cmd-desc" style="font-size:11px; color:#7b8299; margin-bottom:10px;">—</div>
-
-    <div style="display:flex; align-items:center; gap:6px; margin-bottom:14px;">
-      <span id="cmd-status-dot" style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#484d5c;"></span>
-      <span id="cmd-status-text" style="font-size:12px; font-weight:700; letter-spacing:0.05em;">UNKNOWN</span>
-    </div>
-
-    <div id="cmd-buttons" style="display:flex; flex-wrap:wrap; gap:6px;">
-      <button id="cmd-btn-start"
-        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #3d8b50; color:#5cb870; background:#1a2419; cursor:pointer;">
-        START
-      </button>
-      <button id="cmd-btn-stop"
-        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #b84a2a; color:#e06040; background:#241511; cursor:pointer;">
-        STOP
-      </button>
-      <button id="cmd-btn-ack"
-        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #b8860b; color:#e2a020; background:#241d11; cursor:pointer;">
-        ACKNOWLEDGE
-      </button>
-      <button id="cmd-btn-reset"
-        style="flex:1; min-width:70px; font-family:inherit; font-size:11px; font-weight:700; letter-spacing:0.05em; padding:7px 10px; border:1px solid #4a8fc1; color:#4a8fc1; background:#111d24; cursor:pointer;">
-        RESET INTERLOCK
-      </button>
-    </div>
-
-    <div id="cmd-feedback" style="margin-top:10px; font-size:10px; color:#7b8299;"></div>
-
-  </div>
-</div>
-
-<style>
-  #cmd-buttons button:disabled{
-    opacity:0.3;
-    cursor:not-allowed;
-  }
-  #cmd-modal.open{ display:flex !important; }
-</style>
 </body>
 </html>

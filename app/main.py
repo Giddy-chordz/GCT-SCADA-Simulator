@@ -1,8 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +13,9 @@ from app.models import Alarm, DigitalTags, Equipments
 from app.scan_cycles import bagfilter_cycle, gct_cycle, vrm_cycle
 from app.scan_cycles.sensor_ingestion import sensor_vals
 from app.websocket import ws_tags
+from app.ai.root_cause import analyze_alarm
+from app.ai.shift_report import generate_shift_report
+from app.ai.health_score import calculate_health_score
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -228,6 +232,41 @@ async def cmd_ack(tag_id: str):
             a.alarm_acknowledged = True
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "ack", "acked": len(alarms)}
+    finally:
+        db.close()
+
+
+# ── AI endpoints ──────────────────────────────────────────────────────────────
+
+@app.get("/ai/root-cause/{tag_id}", tags=["AI"])
+async def ai_root_cause(tag_id: str):
+    """Return an IBM Granite-generated root-cause analysis for an active alarm tag."""
+    db = SessionLocal()
+    try:
+        result = await analyze_alarm(tag_id, db)
+        return JSONResponse(content=result)
+    finally:
+        db.close()
+
+
+@app.get("/ai/shift-report", tags=["AI"])
+async def ai_shift_report(hours: int = Query(default=8, ge=1, le=24)):
+    """Return an IBM Granite-generated shift handover report covering the last `hours` hours."""
+    db = SessionLocal()
+    try:
+        result = await generate_shift_report(db, hours=hours)
+        return JSONResponse(content=result)
+    finally:
+        db.close()
+
+
+@app.get("/ai/health-score", tags=["AI"])
+async def ai_health_score():
+    """Return per-subsystem and overall plant health scores, with a cached Granite interpretation."""
+    db = SessionLocal()
+    try:
+        result = await calculate_health_score(db)
+        return JSONResponse(content=result)
     finally:
         db.close()
 
