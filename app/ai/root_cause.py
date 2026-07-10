@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.ai.granite_client import call_granite
+from app.ai.gemini_client import call_granite as call_gemini
 from app.models import Alarm, AnalogTags, DigitalTags, Equipments
 
 logger = logging.getLogger(__name__)
@@ -216,7 +216,7 @@ INSTRUCTIONS
   ACTION: <one sentence>
 """
 
-    ai_text = await call_granite(
+    ai_text = await call_gemini(
         prompt,
         max_new_tokens=250,
         temperature=0.2,

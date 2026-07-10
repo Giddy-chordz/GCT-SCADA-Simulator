@@ -386,6 +386,179 @@
   /* Equipment card — show cursor pointer to signal it's clickable */
   .equip-card { cursor: pointer; }
   .equip-card:hover { border-color: var(--border2); }
+
+  /* ── AI INTELLIGENCE LAYER ──────────────────────────────── */
+
+  /* Nav badge (shows on sidebar AI buttons when data is loading) */
+  .nav-ai-badge {
+    float: right; font-size: 9px; padding: 1px 5px;
+    background: var(--accent); color: #fff; border-radius: 2px;
+    line-height: 1.5; font-weight: 700; letter-spacing: 0.04em;
+    display: none;
+  }
+
+  /* AI section header with refresh button */
+  .ai-section-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding-bottom: 6px; margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ai-section-header .ai-refresh-btn {
+    margin-left: auto; background: none; border: 1px solid var(--border2);
+    color: var(--text-muted); font-size: 10px; padding: 2px 8px;
+    cursor: pointer; font-family: var(--font); letter-spacing: 0.05em;
+  }
+  .ai-section-header .ai-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ai-section-header .ai-refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Spinner */
+  .ai-spinner {
+    display: inline-block; width: 10px; height: 10px;
+    border: 2px solid var(--border2); border-top-color: var(--accent);
+    border-radius: 50%; animation: ai-spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 5px;
+  }
+  @keyframes ai-spin { to { transform: rotate(360deg); } }
+
+  /* AI loading / error state */
+  .ai-loading { color: var(--text-muted); font-size: 12px; padding: 16px 0; }
+  .ai-error   { color: var(--alarm-t);    font-size: 11px; padding: 10px; border: 1px solid var(--tripped); background: #1c0d0a; }
+  .ai-cached-note { font-size: 10px; color: var(--text-dim); margin-left: 6px; }
+
+  /* ── Health Score ── */
+  .health-overall-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 16px 20px; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .health-score-ring {
+    flex-shrink: 0; text-align: center;
+  }
+  .health-score-num {
+    font-size: 40px; font-weight: 700; font-family: var(--mono);
+    line-height: 1;
+  }
+  .health-score-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-top: 2px; }
+  .health-interp {
+    font-size: 13px; color: var(--text); line-height: 1.6; flex: 1;
+    border-left: 3px solid var(--accent); padding-left: 14px;
+    font-style: italic;
+  }
+  .health-subsystem-grid {
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px;
+  }
+  @media (max-width: 700px) { .health-subsystem-grid { grid-template-columns: 1fr; } }
+  .health-sub-card {
+    background: var(--surface2); border: 1px solid var(--border); padding: 12px 14px;
+  }
+  .health-sub-card .sub-name { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; }
+  .health-sub-score { font-size: 28px; font-weight: 700; font-family: var(--mono); margin-bottom: 6px; }
+  .health-sub-bar { height: 5px; background: var(--border); margin-bottom: 8px; }
+  .health-sub-bar-fill { height: 100%; transition: width 0.5s; }
+  .health-sub-detail { font-size: 10px; color: var(--text-dim); line-height: 1.8; font-family: var(--mono); }
+
+  /* score colour helpers (applied via JS) */
+  .score-good   { color: var(--running-t); }
+  .score-good   .health-sub-bar-fill { background: var(--running); }
+  .score-warn   { color: var(--warn-t); }
+  .score-warn   .health-sub-bar-fill { background: var(--warn-col); }
+  .score-bad    { color: var(--alarm-t); }
+  .score-bad    .health-sub-bar-fill { background: var(--alarm-col); }
+
+  /* Overview health strip (injected above overview groups) */
+  #overview-health-strip {
+    margin-bottom: 12px; padding: 8px 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  #overview-health-strip .ohs-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-muted); }
+  #overview-health-strip .ohs-score { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+  #overview-health-strip .ohs-interp { font-size: 11px; color: var(--text-muted); flex: 1; font-style: italic; }
+  #overview-health-strip .ohs-link {
+    font-size: 10px; color: var(--accent); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 2px; white-space: nowrap;
+  }
+  #overview-health-strip .ohs-link:hover { color: var(--text); }
+
+  /* ── Root-Cause AI panel ── */
+  .ai-alarm-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .ai-alarm-table th {
+    text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 4px 8px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .ai-alarm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .ai-alarm-table tr:last-child td { border-bottom: none; }
+  .ai-alarm-table tr:hover td { background: var(--surface2); cursor: pointer; }
+  .ai-alarm-table .tag-col { font-family: var(--mono); color: var(--text-muted); font-size: 10px; }
+  .ai-alarm-table .ts-col  { font-family: var(--mono); color: var(--text-dim);   font-size: 10px; }
+  .ai-alarm-table .ai-btn-col { text-align: right; width: 90px; }
+  .ai-analyse-btn {
+    background: none; border: 1px solid var(--accent); color: var(--accent);
+    font-size: 10px; padding: 2px 7px; cursor: pointer; font-family: var(--font);
+    letter-spacing: 0.05em;
+  }
+  .ai-analyse-btn:hover { background: var(--accent); color: #fff; }
+
+  /* Root-cause result panel */
+  #rc-result {
+    background: var(--surface2); border: 1px solid var(--border); padding: 14px 16px;
+    margin-top: 12px; display: none;
+  }
+  #rc-result.visible { display: block; }
+  .rc-tag-line { font-family: var(--mono); font-size: 14px; color: var(--text); margin-bottom: 4px; }
+  .rc-confidence {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 2px 6px; margin-bottom: 10px;
+  }
+  .rc-confidence.high   { background: #0d1f0f; color: var(--running-t); border: 1px solid var(--running); }
+  .rc-confidence.medium { background: #1c1408; color: var(--warn-t);    border: 1px solid var(--warn-col); }
+  .rc-confidence.low    { background: #1c0d0a; color: var(--alarm-t);   border: 1px solid var(--tripped); }
+  .rc-section { margin-bottom: 10px; }
+  .rc-section .rc-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 3px; }
+  .rc-section .rc-val { font-size: 12px; color: var(--text); line-height: 1.6; }
+  .rc-evidence-tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px;
+    background: var(--surface); border: 1px solid var(--border); padding: 1px 5px;
+    margin: 2px 3px 2px 0; color: var(--text-muted);
+  }
+  .rc-action-box {
+    margin-top: 10px; padding: 8px 12px;
+    background: #0d1220; border: 1px solid #2a3a5a; border-left: 3px solid var(--accent);
+    font-size: 12px; color: var(--text); line-height: 1.6;
+  }
+
+  /* ── Shift Report ── */
+  .shift-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .shift-hours-label { font-size: 11px; color: var(--text-muted); }
+  .shift-hours-select {
+    background: var(--surface2); border: 1px solid var(--border2); color: var(--text);
+    font-size: 11px; padding: 3px 8px; font-family: var(--font); cursor: pointer;
+  }
+  .shift-gen-btn {
+    background: none; border: 1px solid var(--accent); color: var(--accent);
+    font-size: 11px; padding: 4px 12px; cursor: pointer; font-family: var(--font);
+    letter-spacing: 0.05em; font-weight: 600;
+  }
+  .shift-gen-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  .shift-gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .shift-meta {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px;
+    padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
+    font-size: 11px; color: var(--text-muted);
+  }
+  .shift-meta .sm-val { color: var(--text); font-weight: 600; margin-left: 4px; font-family: var(--mono); }
+  .shift-meta .sm-crit { color: var(--alarm-t); font-weight: 700; }
+
+  #shift-report-text {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 16px; font-size: 12px; color: var(--text); line-height: 1.9;
+    white-space: pre-wrap; font-family: var(--mono); min-height: 100px;
+  }
 </style>
 </head>
 <body>
@@ -425,6 +598,17 @@
       <div class="nav-section">I/O</div>
       <button data-screen="analog-io"   onclick="showScreen('analog-io',this)">Analog I/O</button>
       <button data-screen="digital-io"  onclick="showScreen('digital-io',this)">Digital I/O</button>
+
+      <div class="nav-section">AI Intelligence</div>
+      <button data-screen="ai-health"  onclick="showScreen('ai-health',this)">
+        Health Score<span class="nav-ai-badge" id="nav-badge-health">AI</span>
+      </button>
+      <button data-screen="ai-alarm"   onclick="showScreen('ai-alarm',this)">
+        Alarm Analysis<span class="nav-ai-badge" id="nav-badge-alarm">AI</span>
+      </button>
+      <button data-screen="ai-shift"   onclick="showScreen('ai-shift',this)">
+        Shift Report<span class="nav-ai-badge" id="nav-badge-shift">AI</span>
+      </button>
     </nav>
 
     <!-- CONTENT -->
@@ -432,6 +616,14 @@
 
       <!-- ══ OVERVIEW ══════════════════════════════════════════ -->
       <div id="screen-overview" class="screen active">
+        <!-- AI Health Strip (auto-refreshed every 60 s) -->
+        <div id="overview-health-strip" style="display:none">
+          <span class="ohs-label">Plant Health</span>
+          <span class="ohs-score" id="ohs-score">—</span>
+          <span style="font-size:10px;color:var(--text-muted)">/100</span>
+          <span class="ohs-interp" id="ohs-interp"></span>
+          <span class="ohs-link" onclick="showScreen('ai-health',document.querySelector('[data-screen=ai-health]'))">Full Report →</span>
+        </div>
         <div class="overview-grid" id="overview-groups"></div>
       </div>
 
@@ -682,6 +874,81 @@
         </table>
       </div>
 
+      <!-- ══ AI: PLANT HEALTH SCORE ════════════════════════════ -->
+      <div id="screen-ai-health" class="screen">
+        <div class="ai-section-header">
+          Plant Health Score
+          <button class="ai-refresh-btn" id="health-refresh-btn" onclick="fetchHealthScore(true)">↻ Refresh</button>
+        </div>
+
+        <div id="health-body">
+          <div class="ai-loading"><span class="ai-spinner"></span>Loading health data…</div>
+        </div>
+      </div>
+
+      <!-- ══ AI: ALARM ROOT-CAUSE ANALYSIS ═════════════════════ -->
+      <div id="screen-ai-alarm" class="screen">
+        <div class="ai-section-header">
+          AI Alarm Analysis
+          <span class="ai-cached-note">Select an active alarm to run root-cause analysis</span>
+        </div>
+
+        <!-- Active alarms table with Analyse buttons -->
+        <div id="ai-alarm-list-wrap">
+          <div class="ai-loading">Waiting for alarm data…</div>
+        </div>
+
+        <!-- Result panel (shown after a successful analysis) -->
+        <div id="rc-result">
+          <div class="rc-tag-line" id="rc-tag-line">—</div>
+          <span class="rc-confidence" id="rc-confidence-badge">—</span>
+          <div class="rc-section">
+            <div class="rc-lbl">Root Cause</div>
+            <div class="rc-val" id="rc-root-cause">—</div>
+          </div>
+          <div class="rc-section">
+            <div class="rc-lbl">Evidence Tags</div>
+            <div class="rc-val" id="rc-evidence">—</div>
+          </div>
+          <div class="rc-action-box" id="rc-action">—</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:8px">
+            Generated: <span id="rc-generated-at" style="font-family:var(--mono)">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ AI: SHIFT HANDOVER REPORT ══════════════════════════ -->
+      <div id="screen-ai-shift" class="screen">
+        <div class="ai-section-header">
+          AI Shift Handover Report
+        </div>
+
+        <div class="shift-controls">
+          <span class="shift-hours-label">Report Period:</span>
+          <select class="shift-hours-select" id="shift-hours">
+            <option value="4">4 hours</option>
+            <option value="8" selected>8 hours</option>
+            <option value="12">12 hours</option>
+            <option value="16">16 hours</option>
+            <option value="24">24 hours</option>
+          </select>
+          <button class="shift-gen-btn" id="shift-gen-btn" onclick="fetchShiftReport()">Generate Report</button>
+        </div>
+
+        <div id="shift-meta-row" style="display:none" class="shift-meta">
+          Period: <span class="sm-val" id="sm-period">—</span>
+          &nbsp;|&nbsp; Total Alarms: <span class="sm-val" id="sm-total">—</span>
+          &nbsp;|&nbsp; Critical: <span class="sm-val sm-crit" id="sm-critical">—</span>
+          &nbsp;|&nbsp; Generated: <span class="sm-val" id="sm-generated">—</span>
+        </div>
+
+        <div id="shift-body">
+          <div class="ai-loading" style="padding:0;color:var(--text-dim);font-size:11px">
+            Click "Generate Report" to produce an AI shift handover brief.
+          </div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /body -->
 
@@ -858,10 +1125,14 @@ function connect() {
 // SCREEN NAVIGATION
 // ══════════════════════════════════════════════════════════
 const SCREEN_TITLES = {
-  overview: 'Plant Overview', mimic: 'Process Mimic',
-  alarms: 'Alarm Summary', trends: 'Trends',
-  vrm: 'VRM Section', gct: 'GCT / Kiln Section', kbf: 'Bag Filter Section',
-  'analog-io': 'All Analog I/O', 'digital-io': 'All Digital I/O',
+  overview:    'Plant Overview',      mimic:       'Process Mimic',
+  alarms:      'Alarm Summary',       trends:      'Trends',
+  vrm:         'VRM Section',         gct:         'GCT / Kiln Section',
+  kbf:         'Bag Filter Section',
+  'analog-io': 'All Analog I/O',      'digital-io':'All Digital I/O',
+  'ai-health': 'AI — Plant Health Score',
+  'ai-alarm':  'AI — Alarm Root-Cause Analysis',
+  'ai-shift':  'AI — Shift Handover Report',
 };
 let currentScreen = 'overview';
 
@@ -873,6 +1144,10 @@ function showScreen(id, btn) {
   currentScreen = id;
   document.getElementById('screen-title-label').textContent = SCREEN_TITLES[id] || id;
   renderCurrentScreen();
+
+  // Trigger AI fetches on first visit to each AI screen
+  if (id === 'ai-health') fetchHealthScore(false);
+  if (id === 'ai-alarm')  renderAiAlarmList();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -985,6 +1260,8 @@ function renderCurrentScreen() {
     case 'kbf':         renderSection('kbf'); break;
     case 'analog-io':   renderAllAnalog();  break;
     case 'digital-io':  renderAllDigital(); break;
+    case 'ai-alarm':    renderAiAlarmList(); break;
+    // ai-health and ai-shift are on-demand only — no WS re-render
   }
 }
 
@@ -1528,9 +1805,272 @@ setInterval(() => {
 }, 1000);
 
 // ══════════════════════════════════════════════════════════
+// AI INTELLIGENCE LAYER
+// ══════════════════════════════════════════════════════════
+
+// ── Shared helpers ────────────────────────────────────────
+
+function scoreColorClass(score) {
+  if (score >= 75) return 'score-good';
+  if (score >= 50) return 'score-warn';
+  return 'score-bad';
+}
+
+function scoreHexColor(score) {
+  if (score >= 75) return 'var(--running-t)';
+  if (score >= 50) return 'var(--warn-t)';
+  return 'var(--alarm-t)';
+}
+
+function setNavBadge(id, loading) {
+  const el = document.getElementById('nav-badge-' + id);
+  if (!el) return;
+  el.style.display = loading ? 'inline' : 'none';
+  el.textContent   = loading ? '…' : 'AI';
+}
+
+// ── Feature 3: Plant Health Score ────────────────────────
+
+let _healthLastFetch = 0;
+const _HEALTH_TTL = 60_000; // re-fetch at most once per 60 s (matches server cache)
+
+async function fetchHealthScore(force) {
+  const now = Date.now();
+  if (!force && (now - _healthLastFetch) < _HEALTH_TTL) return;
+
+  const btn = document.getElementById('health-refresh-btn');
+  if (btn) btn.disabled = true;
+  setNavBadge('health', true);
+
+  const body = document.getElementById('health-body');
+  if (body) body.innerHTML = '<div class="ai-loading"><span class="ai-spinner"></span>Calculating health scores…</div>';
+
+  try {
+    const res  = await fetch('/ai/health-score');
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    _healthLastFetch = Date.now();
+
+    renderHealthScore(data);
+    updateOverviewHealthStrip(data);
+
+  } catch (err) {
+    if (body) body.innerHTML = `<div class="ai-error">⚠ Failed to load health score: ${err.message}</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
+    setNavBadge('health', false);
+  }
+}
+
+function renderHealthScore(data) {
+  const body = document.getElementById('health-body');
+  if (!body) return;
+
+  const overallClass = scoreColorClass(data.overall_score);
+  const overallColor = scoreHexColor(data.overall_score);
+  const cached = data.interp_cached
+    ? '<span class="ai-cached-note">(cached interpretation)</span>' : '';
+
+  let subsystemCards = '';
+  for (const [key, sub] of Object.entries(data.subsystems || {})) {
+    const sc = scoreColorClass(sub.score);
+    subsystemCards += `
+      <div class="health-sub-card ${sc}">
+        <div class="sub-name">${sub.name}</div>
+        <div class="health-sub-score">${sub.score}</div>
+        <div class="health-sub-bar"><div class="health-sub-bar-fill" style="width:${sub.score}%"></div></div>
+        <div class="health-sub-detail">
+          Alarms active: ${sub.active_alarm_count}<br>
+          Drives running: ${sub.drives_running} / ${sub.drives_total}<br>
+          Alarm component: ${sub.alarm_fraction}<br>
+          Equipment component: ${sub.equipment_score}<br>
+          Proximity component: ${sub.proximity_score}
+        </div>
+      </div>`;
+  }
+
+  const genAt = data.generated_at ? data.generated_at.replace('T',' ').slice(0,19) + ' UTC' : '—';
+
+  body.innerHTML = `
+    <div class="health-overall-card">
+      <div class="health-score-ring">
+        <div class="health-score-num" style="color:${overallColor}">${data.overall_score}</div>
+        <div class="health-score-label">Overall / 100</div>
+      </div>
+      <div class="health-interp">${data.interpretation || '—'} ${cached}</div>
+    </div>
+    <div class="health-subsystem-grid">${subsystemCards}</div>
+    <div style="font-size:10px;color:var(--text-dim);text-align:right">
+      Generated: <span style="font-family:var(--mono)">${genAt}</span>
+    </div>`;
+}
+
+function updateOverviewHealthStrip(data) {
+  const strip = document.getElementById('overview-health-strip');
+  if (!strip) return;
+  const score = data.overall_score;
+  document.getElementById('ohs-score').textContent = score;
+  document.getElementById('ohs-score').style.color = scoreHexColor(score);
+  document.getElementById('ohs-interp').textContent = data.interpretation || '';
+  strip.style.display = '';
+}
+
+// Auto-refresh health strip every 60 s regardless of active screen
+setInterval(() => fetchHealthScore(false), 60_000);
+
+// ── Feature 1: Alarm Root-Cause Analysis ─────────────────
+
+function renderAiAlarmList() {
+  const wrap = document.getElementById('ai-alarm-list-wrap');
+  if (!wrap) return;
+
+  if (!state.alarms.length) {
+    wrap.innerHTML = '<div class="ai-loading" style="color:var(--running-t)">✔ No active alarms — nothing to analyse.</div>';
+    document.getElementById('rc-result').classList.remove('visible');
+    return;
+  }
+
+  const rows = state.alarms.map(a => {
+    const tc  = (a.alarm_type || '').toLowerCase();
+    const cls = `alarm-type-${tc}`;
+    const ts  = a.time_stamp ? a.time_stamp.replace('T',' ').slice(0,19) : '—';
+    return `<tr>
+      <td class="ts-col">${ts}</td>
+      <td class="tag-col">${a.tag_id}</td>
+      <td class="${cls}">${a.alarm_type || '—'}</td>
+      <td>${a.alarm_descr || '—'}</td>
+      <td class="ai-btn-col">
+        <button class="ai-analyse-btn" onclick="fetchRootCause('${a.tag_id}')">Analyse</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table class="ai-alarm-table">
+      <thead><tr>
+        <th>Time</th><th>Tag ID</th><th>Type</th><th>Description</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function fetchRootCause(tagId) {
+  setNavBadge('alarm', true);
+  const result = document.getElementById('rc-result');
+  if (result) {
+    result.classList.add('visible');
+    result.innerHTML = `<div class="ai-loading"><span class="ai-spinner"></span>Asking AI to analyse ${tagId}…</div>`;
+  }
+
+  // Scroll result into view
+  if (result) result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res  = await fetch(`/ai/root-cause/${encodeURIComponent(tagId)}`);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    renderRootCause(data);
+
+  } catch (err) {
+    if (result) result.innerHTML = `<div class="ai-error">⚠ Analysis failed: ${err.message}</div>`;
+  } finally {
+    setNavBadge('alarm', false);
+  }
+}
+
+function renderRootCause(data) {
+  const result = document.getElementById('rc-result');
+  if (!result) return;
+  result.classList.add('visible');
+
+  const confClass = (data.confidence || 'low').toLowerCase();
+  const evidenceTags = (data.evidence_tags || [])
+    .map(t => `<span class="rc-evidence-tag">${t}</span>`)
+    .join('');
+  const genAt = data.generated_at
+    ? data.generated_at.replace('T',' ').slice(0,19) + ' UTC' : '—';
+
+  result.innerHTML = `
+    <div class="rc-tag-line">${data.tag_id}</div>
+    <span class="rc-confidence ${confClass}">${confClass} confidence</span>
+    <div class="rc-section">
+      <div class="rc-lbl">Root Cause</div>
+      <div class="rc-val">${data.root_cause_summary || '—'}</div>
+    </div>
+    <div class="rc-section">
+      <div class="rc-lbl">Evidence Tags</div>
+      <div class="rc-val">${evidenceTags || '—'}</div>
+    </div>
+    <div class="rc-action-box">
+      <strong style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--accent)">Recommended Action</strong><br>
+      ${data.suggested_action || '—'}
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:8px">
+      Generated: <span style="font-family:var(--mono)">${genAt}</span>
+    </div>`;
+}
+
+// ── Feature 2: Shift Handover Report ─────────────────────
+
+async function fetchShiftReport() {
+  const btn   = document.getElementById('shift-gen-btn');
+  const hours = document.getElementById('shift-hours').value;
+  const body  = document.getElementById('shift-body');
+  const meta  = document.getElementById('shift-meta-row');
+
+  if (btn)  btn.disabled = true;
+  if (meta) meta.style.display = 'none';
+  setNavBadge('shift', true);
+
+  if (body) body.innerHTML = `<div class="ai-loading"><span class="ai-spinner"></span>Generating ${hours}-hour shift report…</div>`;
+
+  try {
+    const res  = await fetch(`/ai/shift-report?hours=${hours}`);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    renderShiftReport(data);
+
+  } catch (err) {
+    if (body) body.innerHTML = `<div class="ai-error">⚠ Report generation failed: ${err.message}</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
+    setNavBadge('shift', false);
+  }
+}
+
+function renderShiftReport(data) {
+  const body = document.getElementById('shift-body');
+  const meta = document.getElementById('shift-meta-row');
+  if (!body) return;
+
+  // Format period
+  const start = data.period_start ? data.period_start.replace('T',' ').slice(0,16) : '—';
+  const end   = data.period_end   ? data.period_end.replace('T',' ').slice(11,16)  : '—';
+  const gen   = data.generated_at ? data.generated_at.replace('T',' ').slice(0,19) + ' UTC' : '—';
+
+  if (meta) {
+    document.getElementById('sm-period').textContent   = `${start} → ${end} UTC`;
+    document.getElementById('sm-total').textContent    = data.alarm_count ?? '—';
+    document.getElementById('sm-critical').textContent = data.critical_count ?? '—';
+    document.getElementById('sm-generated').textContent = gen;
+    meta.style.display = '';
+  }
+
+  body.innerHTML = `<div id="shift-report-text">${
+    (data.report_text || '— No report generated —')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  }</div>`;
+}
+
+// ══════════════════════════════════════════════════════════
 // START
 // ══════════════════════════════════════════════════════════
 connect();
+// Fetch health score on load so the overview strip is ready immediately
+fetchHealthScore(false);
 </script>
 </body>
 </html>

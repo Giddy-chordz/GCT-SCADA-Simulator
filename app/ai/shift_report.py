@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.ai.granite_client import call_granite
+from app.ai.gemini_client import call_granite
 from app.models import Alarm, Equipments
 
 logger = logging.getLogger(__name__)
