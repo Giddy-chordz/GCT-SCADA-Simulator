@@ -182,6 +182,91 @@ def execute_VRM_trip(db):
         dig_fault_status.binary_state = True
 
 
+# ── Phase 2c + 2d: auxiliary failure cascade monitor ────────────────────────
+#
+# Watches VRM-MD-070-XS (hydraulic pump) and VRM-MD-020-XS (separator).
+# If either stops UNEXPECTEDLY (manual_override False on its DO command tag)
+# while the mill drive is running, a 30-second countdown begins.  If the
+# auxiliary is still stopped after 30 s and the mill is still running,
+# execute_VRM_trip() is called.
+#
+# If manual_override is True on the auxiliary's DO tag, the operator
+# intentionally single-stopped it — no cascade.
+
+async def cascade_monitor():
+
+    # {xs_tag: do_tag}  — pairs of running-feedback tag and command tag
+    auxiliaries = {
+        "VRM-MD-070-XS": "VRM-MD-070",   # hydraulic pump  (2c)
+        "VRM-MD-020-XS": "VRM-MD-020",   # separator       (2d)
+    }
+
+    while True:
+        db = SessionLocal()
+        try:
+            mill_xs = db.query(DigitalTags).filter(
+                DigitalTags.tag_id == "VRM-MD-010-XS"
+            ).first()
+            mill_running = bool(mill_xs and mill_xs.binary_state)
+
+            if not mill_running:
+                # Mill is not running — nothing to protect
+                db.close()
+                await asyncio.sleep(2)
+                db = SessionLocal()
+                continue
+
+            for xs_tag, do_tag in auxiliaries.items():
+                aux_xs = db.query(DigitalTags).filter(
+                    DigitalTags.tag_id == xs_tag
+                ).first()
+                aux_running = bool(aux_xs and aux_xs.binary_state)
+
+                if aux_running:
+                    continue  # auxiliary is healthy — nothing to do
+
+                # Auxiliary has stopped.  Check whether it was intentional.
+                aux_do = db.query(Equipments).filter(
+                    Equipments.tag_id == do_tag
+                ).first()
+                manual = bool(aux_do and aux_do.manual_override)
+
+                if manual:
+                    # Operator deliberately stopped this auxiliary — no cascade
+                    continue
+
+                # Unplanned stop detected.  Close session before the sleep so
+                # we don't hold a DB connection open for 30 seconds.
+                db.close()
+                await asyncio.sleep(30)
+                db = SessionLocal()
+
+                # Re-check conditions after the delay
+                aux_xs_recheck = db.query(DigitalTags).filter(
+                    DigitalTags.tag_id == xs_tag
+                ).first()
+                aux_still_stopped = not (aux_xs_recheck and aux_xs_recheck.binary_state)
+
+                mill_xs_recheck = db.query(DigitalTags).filter(
+                    DigitalTags.tag_id == "VRM-MD-010-XS"
+                ).first()
+                mill_still_running = bool(mill_xs_recheck and mill_xs_recheck.binary_state)
+
+                aux_do_recheck = db.query(Equipments).filter(
+                    Equipments.tag_id == do_tag
+                ).first()
+                still_unplanned = not (aux_do_recheck and aux_do_recheck.manual_override)
+
+                if aux_still_stopped and mill_still_running and still_unplanned:
+                    execute_VRM_trip(db)
+                    db.commit()
+
+        finally:
+            db.close()
+
+        await asyncio.sleep(2)
+
+
 #trip and reset logic
 async def trip_reset():
 

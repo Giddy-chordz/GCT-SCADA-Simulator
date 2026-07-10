@@ -53,6 +53,11 @@ equipments = [
     Equipments(tag_id = "KLN-BG-702-XS", equip_description = "Kiln barring gear running feedback", io_type = "DI"),
     Equipments(tag_id = "KLN-BG-702-XF", equip_description = "Kiln barring gear fault feedback", io_type = "DI"),
 
+    # Phase 2e — kiln feed (requires main drive running as start permissive)
+    Equipments(tag_id = "KLN-FEED-703", equip_description = "Kiln feed command", io_type = "DO"),
+    Equipments(tag_id = "KLN-FEED-703-XS", equip_description = "Kiln feed running feedback", io_type = "DI"),
+    Equipments(tag_id = "KLN-FEED-703-XF", equip_description = "Kiln feed fault feedback", io_type = "DI"),
+
     Equipments(tag_id = "KLN-XS-001", equip_description = "Kiln group running status", io_type = "CALC"),
     Equipments(tag_id = "KLN-XS-002", equip_description = "Kiln group trip latch status", io_type = "CALC"),
 
@@ -208,7 +213,12 @@ digital_tags = [
     #----------Kiln barring gear command, running and fault
     DigitalTags(tag_id = "KLN-BG-702"),
     DigitalTags(tag_id = "KLN-BG-702-XS"),
-    DigitalTags(tag_id = "KLN-BG-702-XF"), 
+    DigitalTags(tag_id = "KLN-BG-702-XF"),
+
+    #----------Kiln feed command, running and fault (Phase 2e)
+    DigitalTags(tag_id = "KLN-FEED-703"),
+    DigitalTags(tag_id = "KLN-FEED-703-XS"),
+    DigitalTags(tag_id = "KLN-FEED-703-XF"),
 
     #----------ID fan command, running and fault
     DigitalTags(tag_id = "KBF-MD-801"),

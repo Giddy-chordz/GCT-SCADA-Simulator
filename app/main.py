@@ -37,9 +37,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(gct_cycle.trip_reset(), name="gct_trip_reset"),
 
         # VRM cycle
-        asyncio.create_task(vrm_cycle.run_sequence(), name="vrm_run_sequence"),
-        asyncio.create_task(vrm_cycle.alarm(),        name="vrm_alarm"),
-        asyncio.create_task(vrm_cycle.trip_reset(),   name="vrm_trip_reset"),
+        asyncio.create_task(vrm_cycle.run_sequence(),    name="vrm_run_sequence"),
+        asyncio.create_task(vrm_cycle.alarm(),           name="vrm_alarm"),
+        asyncio.create_task(vrm_cycle.trip_reset(),      name="vrm_trip_reset"),
+        asyncio.create_task(vrm_cycle.cascade_monitor(), name="vrm_cascade_monitor"),
     ]
 
     try:
@@ -130,6 +131,15 @@ async def cmd_start(tag_id: str):
                 raise HTTPException(
                     status_code=400,
                     detail="Cannot start barring gear (KLN-BG-702): kiln main drive (KLN-KD-701) is currently running. Stop main drive first."
+                )
+
+        # ── 2e. Kiln feed requires main drive running ───────────────────────
+        if tag_id == "KLN-FEED-703":
+            kd_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "KLN-KD-701-XS").first()
+            if not kd_xs or not kd_xs.binary_state:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot start kiln feed (KLN-FEED-703): kiln main drive (KLN-KD-701) is not running. Start main drive first."
                 )
         # ────────────────────────────────────────────────────────────────────
 

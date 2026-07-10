@@ -23,10 +23,20 @@ class AnalogSensor:
         self.spike_probability = spike_probability
         self.spike_size = spike_size
 
+        # Process-coupling drift modifier applied on top of normal drift each
+        # scan cycle.  Positive values push the reading upward, negative
+        # downward.  Set externally by sensor_ingestion.py based on process
+        # state (e.g. VRM running/stopped, lance positions).  Default 0 = no
+        # modifier — pure random-walk behaviour is unchanged.
+        self.drift_modifier: float = 0.0
+
     def read(self):
 
-        # Slow process movement
+        # Slow process movement (symmetric random walk)
         self.value += random.uniform(-self.drift, self.drift)
+
+        # Directed drift from process coupling — additive bias each cycle
+        self.value += self.drift_modifier
 
         # Instrument noise
         self.value += random.gauss(0, self.noise)
