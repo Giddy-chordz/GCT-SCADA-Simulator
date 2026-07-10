@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import SessionLocal
-from app.models import Alarm, DigitalTags, Equipments
+from app.models import Alarm, AnalogTags, DigitalTags, Equipments
 from app.scan_cycles import bagfilter_cycle, gct_cycle, vrm_cycle
 from app.scan_cycles.sensor_ingestion import sensor_vals
 from app.websocket import ws_tags
@@ -115,6 +115,23 @@ async def cmd_start(tag_id: str):
             raise HTTPException(status_code=404, detail=f"{tag_id} not found")
         if equip.io_type not in ("DO",):
             raise HTTPException(status_code=400, detail=f"{tag_id} is not a commandable output")
+
+        # ── 1a. Kiln Drive / Barring Gear mutual exclusion ─────────────────
+        if tag_id == "KLN-KD-701":
+            bg_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "KLN-BG-702-XS").first()
+            if bg_xs and bg_xs.binary_state:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot start kiln main drive (KLN-KD-701): barring gear (KLN-BG-702) is currently running. Stop barring gear first."
+                )
+        if tag_id == "KLN-BG-702":
+            kd_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "KLN-KD-701-XS").first()
+            if kd_xs and kd_xs.binary_state:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot start barring gear (KLN-BG-702): kiln main drive (KLN-KD-701) is currently running. Stop main drive first."
+                )
+        # ────────────────────────────────────────────────────────────────────
 
         if _is_valve(tag_id):
             # Open the valve: assert ZSO, de-assert ZSC
@@ -232,6 +249,202 @@ async def cmd_ack(tag_id: str):
             a.alarm_acknowledged = True
         db.commit()
         return {"ok": True, "tag_id": tag_id, "action": "ack", "acked": len(alarms)}
+    finally:
+        db.close()
+
+
+# ── Grouped interlock command endpoints ─────────────────────────────────────
+#
+# These replace individual tag control for roller positions and lance valves.
+# All interlock checks live here; the individual /cmd/{tag_id}/start|stop
+# routes for those tags remain valid for direct DO commands (e.g. test/maint)
+# but the grouped endpoints are the operator-facing interface.
+
+_ROLLER_ZSU_TAGS = [f"VRM-LS-{i}-ZSU" for i in range(50, 54)]
+_ROLLER_ZSD_TAGS = [f"VRM-LS-{i}-ZSD" for i in range(50, 54)]
+_AIR_LANCE_TAGS  = [f"GCT-XV-{i}" for i in range(401, 411)]
+_WATER_LANCE_TAGS = [f"GCT-XV-{i}" for i in range(501, 511)]
+
+
+@app.post("/cmd/vrm-rollers/{action}", tags=["Commands"])
+async def cmd_vrm_rollers(action: str):
+    """Grouped roller position command.  action must be 'raise' or 'lower'.
+
+    Raise  → all ZSU True,  all ZSD False  (rollers up / maintenance mode)
+    Lower  → all ZSD True,  all ZSU False  (rollers down / grinding mode)
+
+    Permissives for both actions (1c):
+      • VRM-MD-070-XS (hydraulic pump) must be running
+      • VRM-PT-060 process_val must be ≥ l1_val (minimum operating pressure)
+    """
+    if action not in ("raise", "lower"):
+        raise HTTPException(status_code=400, detail="action must be 'raise' or 'lower'")
+
+    db = SessionLocal()
+    try:
+        # ── 1c. Hydraulic permissive check ──────────────────────────────────
+        hyd_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-070-XS").first()
+        if not hyd_xs or not hyd_xs.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot move rollers: hydraulic pump (VRM-MD-070) is not running."
+            )
+
+        pt060 = db.query(AnalogTags).filter(AnalogTags.tag_id == "VRM-PT-060").first()
+        if not pt060 or pt060.process_val < pt060.l1_val:
+            actual  = round(pt060.process_val, 1) if pt060 else "N/A"
+            minimum = pt060.l1_val if pt060 else "N/A"
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot move rollers: hydraulic pressure (VRM-PT-060) is {actual} bar, below minimum operating threshold of {minimum} bar."
+            )
+        # ────────────────────────────────────────────────────────────────────
+
+        if action == "raise":
+            zsu_val, zsd_val = True, False
+        else:
+            zsu_val, zsd_val = False, True
+
+        for zsu_id, zsd_id in zip(_ROLLER_ZSU_TAGS, _ROLLER_ZSD_TAGS):
+            zsu = db.query(DigitalTags).filter(DigitalTags.tag_id == zsu_id).first()
+            zsd = db.query(DigitalTags).filter(DigitalTags.tag_id == zsd_id).first()
+            if zsu: zsu.binary_state = zsu_val
+            if zsd: zsd.binary_state = zsd_val
+
+        db.commit()
+        return {"ok": True, "action": action, "rollers": "up" if action == "raise" else "down"}
+    finally:
+        db.close()
+
+
+@app.post("/cmd/vrm-mill/start", tags=["Commands"])
+async def cmd_vrm_mill_start():
+    """Start VRM mill drive (VRM-MD-010) with all required permissives checked (1d).
+
+    Permissives (all must pass):
+      1. Hydraulic pump (VRM-MD-070-XS) running
+      2. Hydraulic pressure (VRM-PT-060) ≥ l1_val
+      3. Separator (VRM-MD-020-XS) running
+      4. Rollers in grinding/lower mode (all ZSD True)
+      5. No active trip on VRM group (VRM-XS-001 — no active XF fault)
+    """
+    db = SessionLocal()
+    try:
+        # 1. Hydraulic pump running
+        hyd_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-070-XS").first()
+        if not hyd_xs or not hyd_xs.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="VRM mill start blocked: hydraulic pump (VRM-MD-070) is not running."
+            )
+
+        # 2. Hydraulic pressure above threshold
+        pt060 = db.query(AnalogTags).filter(AnalogTags.tag_id == "VRM-PT-060").first()
+        if not pt060 or pt060.process_val < pt060.l1_val:
+            actual  = round(pt060.process_val, 1) if pt060 else "N/A"
+            minimum = pt060.l1_val if pt060 else "N/A"
+            raise HTTPException(
+                status_code=400,
+                detail=f"VRM mill start blocked: hydraulic pressure (VRM-PT-060) is {actual} bar, below minimum {minimum} bar."
+            )
+
+        # 3. Separator running
+        sep_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-020-XS").first()
+        if not sep_xs or not sep_xs.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="VRM mill start blocked: separator (VRM-MD-020) is not running."
+            )
+
+        # 4. All rollers in grinding/lower mode
+        for zsd_id in _ROLLER_ZSD_TAGS:
+            zsd = db.query(DigitalTags).filter(DigitalTags.tag_id == zsd_id).first()
+            if not zsd or not zsd.binary_state:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"VRM mill start blocked: rollers are not in grinding position ({zsd_id} is not True). Lower rollers first."
+                )
+
+        # 5. No active trip / fault on VRM-MD-010-XF
+        xf_di = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-010-XF").first()
+        if xf_di and xf_di.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="VRM mill start blocked: active fault on VRM-MD-010-XF. Reset the drive first."
+            )
+
+        # All permissives passed — assert running feedback
+        xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-010-XS").first()
+        xs_equip = db.query(Equipments).filter(Equipments.tag_id == "VRM-MD-010-XS").first()
+        do_equip = db.query(Equipments).filter(Equipments.tag_id == "VRM-MD-010").first()
+        if xs:       xs.binary_state = True
+        if xs_equip: xs_equip.status = "RUNNING"
+        if do_equip:
+            do_equip.status = "RUNNING"
+            do_equip.manual_override = True
+
+        db.commit()
+        return {"ok": True, "tag_id": "VRM-MD-010", "action": "start"}
+    finally:
+        db.close()
+
+
+@app.post("/cmd/gct-air-lances/{action}", tags=["Commands"])
+async def cmd_gct_air_lances(action: str):
+    """Grouped air lance command.  action must be 'open' or 'close'.
+
+    Open  → all GCT-XV-401…410 ZSO True,  ZSC False
+    Close → all GCT-XV-401…410 ZSO False, ZSC True
+    """
+    if action not in ("open", "close"):
+        raise HTTPException(status_code=400, detail="action must be 'open' or 'close'")
+
+    db = SessionLocal()
+    try:
+        zso_val = action == "open"
+        zsc_val = not zso_val
+        new_status = "RUNNING" if zso_val else "STOPPED"
+
+        for tag_id in _AIR_LANCE_TAGS:
+            zso = db.query(DigitalTags).filter(DigitalTags.tag_id == f"{tag_id}-ZSO").first()
+            zsc = db.query(DigitalTags).filter(DigitalTags.tag_id == f"{tag_id}-ZSC").first()
+            do_equip = db.query(Equipments).filter(Equipments.tag_id == tag_id).first()
+            if zso: zso.binary_state = zso_val
+            if zsc: zsc.binary_state = zsc_val
+            if do_equip: do_equip.status = new_status
+
+        db.commit()
+        return {"ok": True, "action": action, "air_lances": action + "d"}
+    finally:
+        db.close()
+
+
+@app.post("/cmd/gct-water-lances/{action}", tags=["Commands"])
+async def cmd_gct_water_lances(action: str):
+    """Grouped water lance command.  action must be 'open' or 'close'.
+
+    Open  → all GCT-XV-501…510 ZSO True,  ZSC False
+    Close → all GCT-XV-501…510 ZSO False, ZSC True
+    """
+    if action not in ("open", "close"):
+        raise HTTPException(status_code=400, detail="action must be 'open' or 'close'")
+
+    db = SessionLocal()
+    try:
+        zso_val = action == "open"
+        zsc_val = not zso_val
+        new_status = "RUNNING" if zso_val else "STOPPED"
+
+        for tag_id in _WATER_LANCE_TAGS:
+            zso = db.query(DigitalTags).filter(DigitalTags.tag_id == f"{tag_id}-ZSO").first()
+            zsc = db.query(DigitalTags).filter(DigitalTags.tag_id == f"{tag_id}-ZSC").first()
+            do_equip = db.query(Equipments).filter(Equipments.tag_id == tag_id).first()
+            if zso: zso.binary_state = zso_val
+            if zsc: zsc.binary_state = zsc_val
+            if do_equip: do_equip.status = new_status
+
+        db.commit()
+        return {"ok": True, "action": action, "water_lances": action + "d"}
     finally:
         db.close()
 

@@ -219,51 +219,47 @@ digital_tags = [
     DigitalTags(tag_id = "KBF-CS-805")
 ]
 
-#-----------ROLLER POSITION-----------------
+# Default: ALL ROLLERS UP (ZSU=True, ZSD=False) — maintenance/startup state
 for i in range(50, 54):
     digital_tags.append(
-        DigitalTags(tag_id = f"VRM-LS-{i}-ZSU")
+        DigitalTags(tag_id = f"VRM-LS-{i}-ZSU", binary_state = True)
     )
 
 for i in range(50, 54):
     digital_tags.append(
-        DigitalTags(tag_id = f"VRM-LS-{i}-ZSD") #grinding mode
-    ) 
+        DigitalTags(tag_id = f"VRM-LS-{i}-ZSD", binary_state = False)  # grinding mode
+    )
 
-#-------------air lances valve commands----------------
+# Default: AIR LANCES OPEN (ZSO=True, ZSC=False) — air is default cooling medium
 for i in range(401, 411):
     digital_tags.append(
-        DigitalTags(tag_id = f"GCT-XV-{i}")
+        DigitalTags(tag_id = f"GCT-XV-{i}", binary_state = True)
     )
 
-#----------------air lances valve open feedback---------------
 for i in range(401, 411):
     digital_tags.append(
-        DigitalTags(tag_id = f"GCT-XV-{i}-ZSO")
+        DigitalTags(tag_id = f"GCT-XV-{i}-ZSO", binary_state = True)
     )
 
-#----------------air lances valve closed position feedback--------------
 for i in range(401, 411):
     digital_tags.append(
-        DigitalTags(tag_id = f"GCT-XV-{i}-ZSC")
+        DigitalTags(tag_id = f"GCT-XV-{i}-ZSC", binary_state = False)
     )
 
-#--------------for water lances valve command--------------
+# Default: WATER LANCES CLOSED (ZSO=False, ZSC=True) — water off at startup
 for i in range(501, 511):
     digital_tags.append(
-        DigitalTags(tag_id = f"GCT-XV-{i}")
+        DigitalTags(tag_id = f"GCT-XV-{i}", binary_state = False)
     )
 
-#---------------for water lances valve open feedback-----------------
 for i in range(501, 511):
     digital_tags.append(
-        DigitalTags(tag_id = f"GCT-XV-{i}-ZSO")
+        DigitalTags(tag_id = f"GCT-XV-{i}-ZSO", binary_state = False)
     )
 
-#----------------for water lances valve close position feedback----------------------
 for i in range(501, 511):
     digital_tags.append(
-        DigitalTags(tag_id = f"GCT-XV-{i}-ZSC")
+        DigitalTags(tag_id = f"GCT-XV-{i}-ZSC", binary_state = True)
     )
 
 
