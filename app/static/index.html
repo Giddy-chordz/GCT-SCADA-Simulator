@@ -532,6 +532,69 @@
   }
 
   /* ── Shift Report ── */
+  /* ── Interlock control panels ─────────────────────────────── */
+  .interlock-panel {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 10px; margin-bottom: 12px;
+  }
+  .interlock-panel .ip-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    padding-bottom: 5px; margin-bottom: 10px;
+  }
+  .interlock-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+  }
+  .interlock-row:last-child { border-bottom: none; }
+  .interlock-row .ir-label {
+    font-size: 11px; color: var(--text); min-width: 160px;
+  }
+  .interlock-row .ir-status {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; font-family: var(--mono);
+    min-width: 90px;
+  }
+  .ir-status.ok     { color: var(--running-t); }
+  .ir-status.warn   { color: var(--warn-t); }
+  .ir-status.fault  { color: var(--alarm-t); }
+  .ir-status.off    { color: var(--stopped-t); }
+
+  .interlock-row .ir-buttons { display: flex; gap: 6px; margin-left: auto; }
+  .ip-btn {
+    padding: 5px 14px; font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; border: 1px solid; cursor: pointer;
+    font-family: var(--font); background: transparent; white-space: nowrap;
+  }
+  .ip-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+  .ip-btn:not(:disabled):hover { filter: brightness(1.18); }
+  .ip-btn:not(:disabled):active { filter: brightness(0.88); }
+  .ip-btn.raise  { color: #7ab4d8; border-color: #4a8fc1; }
+  .ip-btn.lower  { color: #c47a00; border-color: #8a5500; }
+  .ip-btn.open   { color: #5cb870; border-color: #3d8b50; }
+  .ip-btn.close  { color: #e06040; border-color: #b84a2a; }
+  .ip-btn.pstart { color: #5cb870; border-color: #3d8b50; }
+
+  .ip-feedback {
+    font-size: 10px; font-family: var(--mono);
+    margin-top: 8px; min-height: 14px; color: var(--text-muted);
+  }
+  .ip-feedback.ok  { color: var(--running-t); }
+  .ip-feedback.err { color: var(--alarm-t); }
+
+  /* Permissive check-list */
+  .permissive-list { margin-top: 6px; }
+  .permissive-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; color: var(--text-muted); padding: 2px 0;
+  }
+  .perm-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+  .perm-dot.ok    { background: var(--running); }
+  .perm-dot.fail  { background: var(--alarm-col); }
+  .perm-dot.unkn  { background: var(--stopped); border: 1px solid var(--border2); }
+
   .shift-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
   .shift-hours-label { font-size: 11px; color: var(--text-muted); }
   .shift-hours-select {
@@ -778,6 +841,35 @@
       <!-- ══ VRM SECTION ════════════════════════════════════════ -->
       <div id="screen-vrm" class="screen">
         <div class="section-header">Vertical Roller Mill (VRM) — Section Detail</div>
+
+        <!-- ── VRM Interlock Control Panel ── -->
+        <div class="interlock-panel">
+          <div class="ip-title">VRM Interlock Controls &amp; Permissives</div>
+
+          <!-- Roller position -->
+          <div class="interlock-row">
+            <span class="ir-label">Roller Position</span>
+            <span class="ir-status" id="ip-roller-status">—</span>
+            <div class="ir-buttons">
+              <button class="ip-btn raise" onclick="sendGroupCmd('vrm-rollers','raise','ip-vrm-fb')">▲ Raise</button>
+              <button class="ip-btn lower" onclick="sendGroupCmd('vrm-rollers','lower','ip-vrm-fb')">▼ Lower</button>
+            </div>
+          </div>
+
+          <!-- Mill permissive start -->
+          <div class="interlock-row">
+            <div style="flex:1">
+              <span class="ir-label">Mill Drive Permissive Start</span>
+              <div class="permissive-list" id="ip-vrm-permissives"></div>
+            </div>
+            <div class="ir-buttons">
+              <button class="ip-btn pstart" onclick="sendGroupCmd('vrm-mill','start','ip-vrm-fb')">▶ Perm. Start</button>
+            </div>
+          </div>
+
+          <div class="ip-feedback" id="ip-vrm-fb"></div>
+        </div>
+
         <div class="panel-row">
           <div class="panel">
             <div class="panel-title">Analog Instruments</div>
@@ -789,7 +881,7 @@
         </div>
         <div class="panel-row">
           <div class="panel">
-            <div class="panel-title">Drive & Equipment Status</div>
+            <div class="panel-title">Drive &amp; Equipment Status</div>
             <div class="equip-grid" id="vrm-equip-grid"></div>
           </div>
           <div class="panel">
@@ -805,6 +897,40 @@
       <!-- ══ GCT SECTION ════════════════════════════════════════ -->
       <div id="screen-gct" class="screen">
         <div class="section-header">Gas Conditioning Tower (GCT) / Kiln — Section Detail</div>
+
+        <!-- ── GCT Interlock Control Panel ── -->
+        <div class="interlock-panel">
+          <div class="ip-title">GCT Lance Controls &amp; Kiln Interlocks</div>
+
+          <!-- Air lances -->
+          <div class="interlock-row">
+            <span class="ir-label">Air Lances (GCT-XV-401…410)</span>
+            <span class="ir-status" id="ip-air-status">—</span>
+            <div class="ir-buttons">
+              <button class="ip-btn open"  onclick="sendGroupCmd('gct-air-lances','open','ip-gct-fb')">▶ Open All</button>
+              <button class="ip-btn close" onclick="sendGroupCmd('gct-air-lances','close','ip-gct-fb')">■ Close All</button>
+            </div>
+          </div>
+
+          <!-- Water lances -->
+          <div class="interlock-row">
+            <span class="ir-label">Water Lances (GCT-XV-501…510)</span>
+            <span class="ir-status" id="ip-water-status">—</span>
+            <div class="ir-buttons">
+              <button class="ip-btn open"  onclick="sendGroupCmd('gct-water-lances','open','ip-gct-fb')">▶ Open All</button>
+              <button class="ip-btn close" onclick="sendGroupCmd('gct-water-lances','close','ip-gct-fb')">■ Close All</button>
+            </div>
+          </div>
+
+          <!-- GCT-TT-102 thermal coupling indicator -->
+          <div class="interlock-row">
+            <span class="ir-label">GCT Thermal Regime (TT-102)</span>
+            <span class="ir-status" id="ip-thermal-regime">—</span>
+          </div>
+
+          <div class="ip-feedback" id="ip-gct-fb"></div>
+        </div>
+
         <div class="panel-row">
           <div class="panel">
             <div class="panel-title">Analog Instruments</div>
@@ -816,7 +942,7 @@
         </div>
         <div class="panel-row">
           <div class="panel">
-            <div class="panel-title">Drive & Equipment Status</div>
+            <div class="panel-title">Drive &amp; Equipment Status</div>
             <div class="equip-grid" id="gct-equip-grid"></div>
           </div>
           <div class="panel">
@@ -1051,10 +1177,12 @@ const SECTIONS = {
     digital: ['GCT-LSH-301','GCT-LSH-302',
               'GCT-MP-601','GCT-MP-601-XS','GCT-MP-601-XF',
               'KLN-KD-701','KLN-KD-701-XS','KLN-KD-701-XF',
-              'KLN-BG-702','KLN-BG-702-XS','KLN-BG-702-XF'],
+              'KLN-BG-702','KLN-BG-702-XS','KLN-BG-702-XF',
+              'KLN-FEED-703','KLN-FEED-703-XS','KLN-FEED-703-XF'],
     equip:   ['GCT-MP-601','GCT-MP-601-XS','GCT-MP-601-XF',
               'KLN-KD-701','KLN-KD-701-XS','KLN-KD-701-XF',
               'KLN-BG-702','KLN-BG-702-XS','KLN-BG-702-XF',
+              'KLN-FEED-703','KLN-FEED-703-XS','KLN-FEED-703-XF',
               'KLN-XS-001','KLN-XS-002'],
   },
   kbf: {
@@ -1246,6 +1374,7 @@ function buildEquipCard(tagId) {
 function render() {
   renderStatusBar();
   renderAlarmBanner();
+  renderInterlockPanels();   // always update interlock status indicators
   renderCurrentScreen();
 }
 
@@ -1796,6 +1925,114 @@ document.getElementById('cmd-btn-start').addEventListener('click', () => sendCmd
 document.getElementById('cmd-btn-stop' ).addEventListener('click', () => sendCmd('stop'));
 document.getElementById('cmd-btn-reset').addEventListener('click', () => sendCmd('reset'));
 document.getElementById('cmd-btn-ack'  ).addEventListener('click', () => sendCmd('ack'));
+
+// ══════════════════════════════════════════════════════════
+// GROUPED INTERLOCK COMMANDS  (Phase 1b/1c/1d/1e)
+// ══════════════════════════════════════════════════════════
+
+// sendGroupCmd — calls one of the grouped endpoints:
+//   POST /cmd/vrm-rollers/{action}
+//   POST /cmd/vrm-mill/start
+//   POST /cmd/gct-air-lances/{action}
+//   POST /cmd/gct-water-lances/{action}
+//
+// group  = "vrm-rollers" | "vrm-mill" | "gct-air-lances" | "gct-water-lances"
+// action = "raise" | "lower" | "start" | "open" | "close"
+// fbId   = id of the .ip-feedback element to write into
+
+async function sendGroupCmd(group, action, fbId) {
+  const fb = document.getElementById(fbId);
+  if (fb) { fb.textContent = `Sending ${action.toUpperCase()}…`; fb.className = 'ip-feedback'; }
+
+  const url = `/cmd/${group}/${action}`;
+  try {
+    const res  = await fetch(url, { method: 'POST' });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (res.ok) {
+      if (fb) { fb.textContent = `${action.toUpperCase()} OK`; fb.className = 'ip-feedback ok'; }
+    } else {
+      const msg = data.detail || res.statusText;
+      if (fb) { fb.textContent = `REJECTED: ${msg}`; fb.className = 'ip-feedback err'; }
+    }
+  } catch (err) {
+    if (fb) { fb.textContent = `Network error: ${err.message}`; fb.className = 'ip-feedback err'; }
+  }
+}
+
+// ── Interlock panel live-update (called every WS render) ──────────────────
+
+function _dotHtml(ok, unkn) {
+  const cls = unkn ? 'unkn' : (ok ? 'ok' : 'fail');
+  return `<span class="perm-dot ${cls}"></span>`;
+}
+
+function renderInterlockPanels() {
+  // ── VRM roller status ────────────────────────────────────────────────────
+  const rollerEl = document.getElementById('ip-roller-status');
+  if (rollerEl) {
+    const zsdTags = ['VRM-LS-50-ZSD','VRM-LS-51-ZSD','VRM-LS-52-ZSD','VRM-LS-53-ZSD'];
+    const zsuTags = ['VRM-LS-50-ZSU','VRM-LS-51-ZSU','VRM-LS-52-ZSU','VRM-LS-53-ZSU'];
+    const allDown = zsdTags.every(t => state.digital[t] && state.digital[t].binary_state);
+    const allUp   = zsuTags.every(t => state.digital[t] && state.digital[t].binary_state);
+    if (allDown)      { rollerEl.textContent = 'GRINDING (DOWN)'; rollerEl.className = 'ir-status ok'; }
+    else if (allUp)   { rollerEl.textContent = 'RAISED (UP)';     rollerEl.className = 'ir-status warn'; }
+    else              { rollerEl.textContent = 'PARTIAL / TRANSIT'; rollerEl.className = 'ir-status fault'; }
+  }
+
+  // ── VRM mill permissive check-list ───────────────────────────────────────
+  const permEl = document.getElementById('ip-vrm-permissives');
+  if (permEl) {
+    const hydOk  = !!(state.digital['VRM-MD-070-XS'] && state.digital['VRM-MD-070-XS'].binary_state);
+    const pt060  = state.analog['VRM-PT-060'];
+    const presOk = pt060 ? (pt060.process_val >= pt060.l1_val) : false;
+    const sepOk  = !!(state.digital['VRM-MD-020-XS'] && state.digital['VRM-MD-020-XS'].binary_state);
+    const zsdTags= ['VRM-LS-50-ZSD','VRM-LS-51-ZSD','VRM-LS-52-ZSD','VRM-LS-53-ZSD'];
+    const rollOk = zsdTags.every(t => state.digital[t] && state.digital[t].binary_state);
+    const xfDig  = state.digital['VRM-MD-010-XF'];
+    const noFault= !xfDig || !xfDig.binary_state;
+
+    const presVal = pt060 ? `${pt060.process_val.toFixed(1)} / ${pt060.l1_val} bar` : '—';
+    permEl.innerHTML = `
+      <div class="permissive-item">${_dotHtml(hydOk,false)} Hydraulic pump running (VRM-MD-070-XS)</div>
+      <div class="permissive-item">${_dotHtml(presOk,!pt060)} Hydraulic pressure ≥ L1 (${presVal})</div>
+      <div class="permissive-item">${_dotHtml(sepOk,false)} Separator running (VRM-MD-020-XS)</div>
+      <div class="permissive-item">${_dotHtml(rollOk,false)} Rollers in grinding mode (all ZSD True)</div>
+      <div class="permissive-item">${_dotHtml(noFault,false)} No active mill fault (VRM-MD-010-XF)</div>`;
+  }
+
+  // ── Air lance status ─────────────────────────────────────────────────────
+  const airEl = document.getElementById('ip-air-status');
+  if (airEl) {
+    const openCount  = [401,402,403,404,405,406,407,408,409,410]
+      .filter(i => state.digital[`GCT-XV-${i}-ZSO`] && state.digital[`GCT-XV-${i}-ZSO`].binary_state).length;
+    if (openCount === 10)     { airEl.textContent = 'ALL OPEN';   airEl.className = 'ir-status ok'; }
+    else if (openCount === 0) { airEl.textContent = 'ALL CLOSED'; airEl.className = 'ir-status off'; }
+    else                      { airEl.textContent = `${openCount}/10 OPEN`; airEl.className = 'ir-status warn'; }
+  }
+
+  // ── Water lance status ───────────────────────────────────────────────────
+  const waterEl = document.getElementById('ip-water-status');
+  if (waterEl) {
+    const openCount = [501,502,503,504,505,506,507,508,509,510]
+      .filter(i => state.digital[`GCT-XV-${i}-ZSO`] && state.digital[`GCT-XV-${i}-ZSO`].binary_state).length;
+    if (openCount === 10)     { waterEl.textContent = 'ALL OPEN';   waterEl.className = 'ir-status ok'; }
+    else if (openCount === 0) { waterEl.textContent = 'ALL CLOSED'; waterEl.className = 'ir-status off'; }
+    else                      { waterEl.textContent = `${openCount}/10 OPEN`; waterEl.className = 'ir-status warn'; }
+  }
+
+  // ── GCT thermal regime indicator ────────────────────────────────────────
+  const thermalEl = document.getElementById('ip-thermal-regime');
+  if (thermalEl) {
+    const vrmOn   = !!(state.digital['VRM-MD-010-XS'] && state.digital['VRM-MD-010-XS'].binary_state);
+    const waterOn = [501,502,503,504,505,506,507,508,509,510]
+      .every(i => state.digital[`GCT-XV-${i}-ZSO`] && state.digital[`GCT-XV-${i}-ZSO`].binary_state);
+    if (vrmOn && waterOn)       { thermalEl.textContent = 'STABLE (VRM on + water)';     thermalEl.className = 'ir-status ok'; }
+    else if (vrmOn && !waterOn) { thermalEl.textContent = 'SLOW RISE (air-only)';        thermalEl.className = 'ir-status warn'; }
+    else if (!vrmOn && waterOn) { thermalEl.textContent = 'MODERATE RISE (VRM off)';     thermalEl.className = 'ir-status warn'; }
+    else                        { thermalEl.textContent = 'FAST RISE (VRM off, no water)'; thermalEl.className = 'ir-status fault'; }
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 // CLOCK — runs independently of WS
