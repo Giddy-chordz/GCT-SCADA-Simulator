@@ -62,9 +62,15 @@ async def run_sequence():
                 xs_equip = db.query(Equipments).filter(Equipments.tag_id == xs_id).first()
 
                 # If the operator has manually commanded this drive, skip
-                # automatic status recalculation so their command is respected.
+                # automatic status recalculation so their command is respected —
+                # UNLESS a critical process limit (H2/L2) has been breached, in
+                # which case manual_override is cleared and the drive is stopped
+                # immediately (no 120-second countdown delay).
                 if do_equip and do_equip.manual_override:
-                    continue
+                    if all_analog_ok:
+                        continue
+                    # H2 or L2 breach — override the manual lock and stop now
+                    do_equip.manual_override = False
 
                 new_status = "RUNNING" if (all_analog_ok and digital_ok and roller_up) else "STOPPED"
                 if do_equip:

@@ -105,6 +105,78 @@ def _is_valve(tag_id: str) -> bool:
     return "-XV-" in tag_id
 
 
+@app.post("/cmd/vrm-mill/start", tags=["Commands"])
+async def cmd_vrm_mill_start():
+    """Start VRM mill drive (VRM-MD-010) with all required permissives checked (1d).
+
+    Permissives (all must pass):
+      1. Hydraulic pump (VRM-MD-070-XS) running
+      2. Hydraulic pressure (VRM-PT-060) ≥ l1_val
+      3. Separator (VRM-MD-020-XS) running
+      4. Rollers in grinding/lower mode (all ZSD True)
+      5. No active trip on VRM group (VRM-XS-001 — no active XF fault)
+    """
+    db = SessionLocal()
+    try:
+        # 1. Hydraulic pump running
+        hyd_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-070-XS").first()
+        if not hyd_xs or not hyd_xs.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="VRM mill start blocked: hydraulic pump (VRM-MD-070) is not running."
+            )
+
+        # 2. Hydraulic pressure above threshold
+        pt060 = db.query(AnalogTags).filter(AnalogTags.tag_id == "VRM-PT-060").first()
+        if not pt060 or pt060.process_val < pt060.l1_val:
+            actual  = round(pt060.process_val, 1) if pt060 else "N/A"
+            minimum = pt060.l1_val if pt060 else "N/A"
+            raise HTTPException(
+                status_code=400,
+                detail=f"VRM mill start blocked: hydraulic pressure (VRM-PT-060) is {actual} bar, below minimum {minimum} bar."
+            )
+
+        # 3. Separator running
+        sep_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-020-XS").first()
+        if not sep_xs or not sep_xs.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="VRM mill start blocked: separator (VRM-MD-020) is not running."
+            )
+
+        # 4. All rollers in grinding/lower mode
+        for zsd_id in _ROLLER_ZSD_TAGS:
+            zsd = db.query(DigitalTags).filter(DigitalTags.tag_id == zsd_id).first()
+            if not zsd or not zsd.binary_state:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"VRM mill start blocked: rollers are not in grinding position ({zsd_id} is not True). Lower rollers first."
+                )
+
+        # 5. No active trip / fault on VRM-MD-010-XF
+        xf_di = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-010-XF").first()
+        if xf_di and xf_di.binary_state:
+            raise HTTPException(
+                status_code=400,
+                detail="VRM mill start blocked: active fault on VRM-MD-010-XF. Reset the drive first."
+            )
+
+        # All permissives passed — assert running feedback
+        xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-010-XS").first()
+        xs_equip = db.query(Equipments).filter(Equipments.tag_id == "VRM-MD-010-XS").first()
+        do_equip = db.query(Equipments).filter(Equipments.tag_id == "VRM-MD-010").first()
+        if xs:       xs.binary_state = True
+        if xs_equip: xs_equip.status = "RUNNING"
+        if do_equip:
+            do_equip.status = "RUNNING"
+            do_equip.manual_override = True
+
+        db.commit()
+        return {"ok": True, "tag_id": "VRM-MD-010", "action": "start"}
+    finally:
+        db.close()
+
+
 @app.post("/cmd/{tag_id}/start", tags=["Commands"])
 async def cmd_start(tag_id: str):
     """Assert running feedback (or open feedback for valves) so the scan cycle
@@ -323,78 +395,6 @@ async def cmd_vrm_rollers(action: str):
 
         db.commit()
         return {"ok": True, "action": action, "rollers": "up" if action == "raise" else "down"}
-    finally:
-        db.close()
-
-
-@app.post("/cmd/vrm-mill/start", tags=["Commands"])
-async def cmd_vrm_mill_start():
-    """Start VRM mill drive (VRM-MD-010) with all required permissives checked (1d).
-
-    Permissives (all must pass):
-      1. Hydraulic pump (VRM-MD-070-XS) running
-      2. Hydraulic pressure (VRM-PT-060) ≥ l1_val
-      3. Separator (VRM-MD-020-XS) running
-      4. Rollers in grinding/lower mode (all ZSD True)
-      5. No active trip on VRM group (VRM-XS-001 — no active XF fault)
-    """
-    db = SessionLocal()
-    try:
-        # 1. Hydraulic pump running
-        hyd_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-070-XS").first()
-        if not hyd_xs or not hyd_xs.binary_state:
-            raise HTTPException(
-                status_code=400,
-                detail="VRM mill start blocked: hydraulic pump (VRM-MD-070) is not running."
-            )
-
-        # 2. Hydraulic pressure above threshold
-        pt060 = db.query(AnalogTags).filter(AnalogTags.tag_id == "VRM-PT-060").first()
-        if not pt060 or pt060.process_val < pt060.l1_val:
-            actual  = round(pt060.process_val, 1) if pt060 else "N/A"
-            minimum = pt060.l1_val if pt060 else "N/A"
-            raise HTTPException(
-                status_code=400,
-                detail=f"VRM mill start blocked: hydraulic pressure (VRM-PT-060) is {actual} bar, below minimum {minimum} bar."
-            )
-
-        # 3. Separator running
-        sep_xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-020-XS").first()
-        if not sep_xs or not sep_xs.binary_state:
-            raise HTTPException(
-                status_code=400,
-                detail="VRM mill start blocked: separator (VRM-MD-020) is not running."
-            )
-
-        # 4. All rollers in grinding/lower mode
-        for zsd_id in _ROLLER_ZSD_TAGS:
-            zsd = db.query(DigitalTags).filter(DigitalTags.tag_id == zsd_id).first()
-            if not zsd or not zsd.binary_state:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"VRM mill start blocked: rollers are not in grinding position ({zsd_id} is not True). Lower rollers first."
-                )
-
-        # 5. No active trip / fault on VRM-MD-010-XF
-        xf_di = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-010-XF").first()
-        if xf_di and xf_di.binary_state:
-            raise HTTPException(
-                status_code=400,
-                detail="VRM mill start blocked: active fault on VRM-MD-010-XF. Reset the drive first."
-            )
-
-        # All permissives passed — assert running feedback
-        xs = db.query(DigitalTags).filter(DigitalTags.tag_id == "VRM-MD-010-XS").first()
-        xs_equip = db.query(Equipments).filter(Equipments.tag_id == "VRM-MD-010-XS").first()
-        do_equip = db.query(Equipments).filter(Equipments.tag_id == "VRM-MD-010").first()
-        if xs:       xs.binary_state = True
-        if xs_equip: xs_equip.status = "RUNNING"
-        if do_equip:
-            do_equip.status = "RUNNING"
-            do_equip.manual_override = True
-
-        db.commit()
-        return {"ok": True, "tag_id": "VRM-MD-010", "action": "start"}
     finally:
         db.close()
 
