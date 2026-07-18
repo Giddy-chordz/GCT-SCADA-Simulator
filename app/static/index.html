@@ -2884,8 +2884,144 @@ setInterval(syncTripCountdown, 1000);
 // Initial load
 syncTripCountdown();
 
+/* ══════════════════════════════════════════════════════════
+   AI OPERATOR COPILOT — polls /ai/copilot-messages every 15s.
+   Shows a popup ONLY when the backend has a new recommendation.
+   Silent otherwise. Matches ai_copilot.py on the backend, which
+   only queues a message when something NEW needs attention.
+   ══════════════════════════════════════════════════════════ */
 
+const COPILOT_POLL_MS = 15_000;
+const COPILOT_AUTO_DISMISS_MS = 25_000; // popup stays up 25s unless dismissed
+
+async function pollCopilot() {
+  try {
+    const res = await fetch('/ai/copilot-messages');
+    if (!res.ok) return; // stay silent on error — don't nag the operator
+    const data = await res.json();
+
+    (data.messages || []).forEach(msg => showCopilotPopup(msg));
+
+  } catch (err) {
+    // Network hiccup — say nothing, just try again next poll.
+    console.warn('Copilot poll failed:', err.message);
+  }
+}
+
+function showCopilotPopup(msg) {
+  const container = document.getElementById('copilot-popup-container');
+  if (!container) return;
+
+  const popupId = 'copilot-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+
+  const severityClass =
+    (msg.alarm_type === 'H2' || msg.alarm_type === 'L2' || msg.alarm_type === 'TRIPPED')
+      ? 'copilot-crit' : 'copilot-warn';
+
+  const popup = document.createElement('div');
+  popup.className = `copilot-popup ${severityClass}`;
+  popup.id = popupId;
+  popup.innerHTML = `
+    <div class="copilot-popup-head">
+      <span class="copilot-icon">🤖</span>
+      <span class="copilot-tag">${msg.tag_id}</span>
+      <span class="copilot-close" onclick="dismissCopilotPopup('${popupId}')">✕</span>
+    </div>
+    <div class="copilot-popup-body">${msg.message}</div>
+    <div class="copilot-popup-time">${new Date(msg.timestamp).toLocaleTimeString('en-GB')}</div>
+  `;
+
+  container.appendChild(popup);
+
+  // Slide in
+  requestAnimationFrame(() => popup.classList.add('show'));
+
+  // Auto-dismiss after a while so the operator isn't buried in old popups
+  setTimeout(() => dismissCopilotPopup(popupId), COPILOT_AUTO_DISMISS_MS);
+}
+
+function dismissCopilotPopup(popupId) {
+  const el = document.getElementById(popupId);
+  if (!el) return;
+  el.classList.remove('show');
+  setTimeout(() => el.remove(), 300); // wait for slide-out transition
+}
+
+// Start polling once the page loads
+setInterval(pollCopilot, COPILOT_POLL_MS);
+pollCopilot(); // check immediately on load too
 </script>
+
+<!-- ══════════════════════════════════════════════════════════
+     AI COPILOT — add this HTML block once, right before </body>
+     ══════════════════════════════════════════════════════════ -->
+
+<div id="copilot-popup-container"></div>
+
+<style>
+  #copilot-popup-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column-reverse; /* newest on top */
+    gap: 10px;
+    max-width: 340px;
+  }
+
+  .copilot-popup {
+    background: #1a1d24;
+    border: 1px solid #3a3e4a;
+    border-left: 4px solid #4a8fc1;
+    padding: 10px 12px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .copilot-popup.show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .copilot-popup.copilot-warn { border-left-color: #e2a020; }
+  .copilot-popup.copilot-crit { border-left-color: #e74c3c; }
+
+  .copilot-popup-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .copilot-icon { font-size: 13px; }
+  .copilot-tag {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    color: #d4d8e2;
+    font-weight: 700;
+    flex: 1;
+  }
+  .copilot-close {
+    cursor: pointer;
+    color: #7b8299;
+    font-size: 12px;
+    padding: 0 2px;
+  }
+  .copilot-close:hover { color: #d4d8e2; }
+
+  .copilot-popup-body {
+    font-size: 12px;
+    color: #d4d8e2;
+    line-height: 1.5;
+  }
+  .copilot-popup-time {
+    font-size: 9px;
+    color: #7b8299;
+    margin-top: 6px;
+    font-family: 'Consolas', monospace;
+  }
+</style>
 
 </body>
 </html>

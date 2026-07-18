@@ -1,4 +1,7 @@
-import asyncio
-from scan_cycles.sensor_ingestion import sensor_vals
+from dotenv import load_dotenv
+import os
 
-asyncio.run(sensor_vals())
+load_dotenv()
+
+print(os.getcwd())
+print(os.getenv("GROQ_API_KEY"))

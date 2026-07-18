@@ -16,6 +16,11 @@ from app.websocket import ws_tags
 from app.ai.root_cause import analyze_alarm
 from app.ai.shift_report import generate_shift_report
 from app.ai.health_score import calculate_health_score
+from app.scan_cycles.gct_cycle import trip_state as gct_trip_state
+from app.scan_cycles.vrm_cycle import trip_state as vrm_trip_state
+from app.scan_cycles.bagfilter_cycle import trip_state as kbf_trip_state
+from app.ai.ai_copilot import ai_copilot, copilot_messages
+
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -40,6 +45,9 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(vrm_cycle.alarm(),           name="vrm_alarm"),
         asyncio.create_task(vrm_cycle.trip_reset(),      name="vrm_trip_reset"),
         asyncio.create_task(vrm_cycle.cascade_monitor(), name="vrm_cascade_monitor"),
+
+        # AI copilot
+        asyncio.create_task(ai_copilot(), name="ai_copilot"),
     ]
 
     try:
@@ -115,19 +123,20 @@ def _zsc_tag(tag_id: str) -> str:
 def _is_valve(tag_id: str) -> bool:
     return "-XV-" in tag_id
 
+#copilot endpoints
+@app.get("/ai/copilot-messages", tags=["AI"])
+async def get_copilot_messages():
+    unseen = [m for m in copilot_messages if not m["seen"]]
+    for m in unseen:
+        m["seen"] = True
+    return {"messages": unseen}
+
 @app.get("/trip-status", tags=["Trips"])
 async def get_trip_status():
-    """
-    Returns the active automatic trip countdown.
-    """
-
-    return {
-        "active": trip_state["active"],
-        "remaining": trip_state["remaining"],
-        "reason": trip_state["reason"],
-        "equipment": trip_state["equipment"],
-        "started_at": trip_state["started_at"]
-    }
+    for ts in (gct_trip_state, vrm_trip_state, kbf_trip_state):
+        if ts["active"]:
+            return ts
+    return {"active": False, "remaining": 0, "reason": None, "equipment": None, "started_at": None}
 
 
 @app.post("/cmd/vrm-mill/start", tags=["Commands"])

@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.ai.gemini_client import call_granite
+from app.ai.groq_client import call_granite
 from app.models import Alarm, AnalogTags, DigitalTags, Equipments
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,16 @@ from app.database import SessionLocal
 from app.models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus
 from sqlalchemy import and_
 import asyncio
+import datetime
 
+#tracking the trip state for the kiln equipment
+trip_state = {
+    "active": False,
+    "remaining": 0,
+    "reason": None,
+    "equipment": None,
+    "started_at": None,
+}
 
 #set running condition for the system
 async def running():
@@ -173,142 +182,50 @@ def execute_kiln_trip(db):
 
 #trip and reset logic
 async def trip_reset():
-
     while True:
         db = SessionLocal()
         try:
-            #check if L2 or H2 alarm is active and then stop the equipment
-
-            tags = ["GCT-TT-102", "GCT-FT-202"]  #for both directions (L2 and H2)
+            tags = ["GCT-TT-102", "GCT-FT-202"]
             for tag in tags:
-
-                #query to identify the tag_id with active L2 or H2 alarm
                 alarm_query = db.query(Alarm).filter(and_(
                     Alarm.tag_id == tag,
                     Alarm.alarm_type.in_(["L2", "H2"]),
                     Alarm.alarm_active == True
                 )).first()
 
-                #count down timer for 120 seconds before tripping the equipment
-                trip_state = {"active": False, "remaining": 0, "reason": None}
-
-                #condition to check if H2 or L2 alarm is active
                 if alarm_query:
-
                     db.close()
-                    #create a time delay of 120sec before tripping
+
                     trip_state["active"] = True
                     trip_state["remaining"] = 120
                     trip_state["reason"] = tag
+                    trip_state["equipment"] = "KLN-KD-701"
+                    trip_state["started_at"] = datetime.utcnow().isoformat()
 
-                    for sec in range(120,0,-1):
-
+                    db = SessionLocal()
+                    for sec in range(120, 0, -1):
                         trip_state["remaining"] = sec
-
                         await asyncio.sleep(1)
 
                         db.close()
                         db = SessionLocal()
 
                         still_active = db.query(Alarm).filter(and_(
-
                             Alarm.tag_id == tag,
-                            Alarm.alarm_type.in_(["L2","H2"]),
+                            Alarm.alarm_type.in_(["L2", "H2"]),
                             Alarm.alarm_active == True
-
                         )).first()
 
                         if not still_active:
-
                             trip_state["active"] = False
                             trip_state["remaining"] = 0
-
                             break
 
-                    db = SessionLocal()
-                    #in order not to stop the equipment when the alarm has cleared during countdown
-                    #query to check if the alarm is still active
-                    still_active = db.query(Alarm).filter(and_(
-                        Alarm.tag_id == tag,
-                        Alarm.alarm_type.in_(["L2", "H2"]),
-                        Alarm.alarm_active == True
-                    )).first()
-
-                    #if alarm is not active, stop the timer and prevent the trip
-                    if not still_active:
-                        continue
-
-                    #if the alarm is therefore still active, execute the trip
-                    execute_kiln_trip(db)
-                    db.commit()
-
-                else:
-                    continue
-
-            #repeat for unidirectional (L2 airflow alarm to trip the kiln)
-            alarm_query = db.query(Alarm).filter(and_(
-                Alarm.tag_id == "GCT-FT-201",
-                Alarm.alarm_type == "L2",
-                Alarm.alarm_active == True
-            )).first()
-
-            #count down timer for 120 seconds before tripping the equipment
-            trip_state = {"active": False, "remaining": 0, "reason": None}
-
-            if alarm_query:
-
-                db.close()
-                #create a time delay of 120sec before tripping
-                trip_state["active"] = True
-                trip_state["remaining"] = 120
-                trip_state["reason"] = tag
-
-                for sec in range(120,0,-1):
-
-                    trip_state["remaining"] = sec
-
-                    await asyncio.sleep(1)
-
-                    db.close()
-                    db = SessionLocal()
-
-                    still_active = db.query(Alarm).filter(and_(
-
-                        Alarm.tag_id == tag,
-                        Alarm.alarm_type.in_(["L2","H2"]),
-                        Alarm.alarm_active == True
-
-                    )).first()
-
-                    if not still_active:
-
+                    if trip_state["active"]:
+                        execute_kiln_trip(db)
+                        db.commit()
                         trip_state["active"] = False
                         trip_state["remaining"] = 0
-
-                        break
-
-                db = SessionLocal()
-                #in order not to stop the equipment when the alarm has cleared during countdown
-                #query to check if the alarm is still active
-                still_active = db.query(Alarm).filter(and_(
-                    Alarm.tag_id == "GCT-FT-201",
-                    Alarm.alarm_type == "L2",
-                    Alarm.alarm_active == True
-                )).first()
-
-                #if alarm is not active, stop the timer and prevent the trip
-                if not still_active:
-                    db.close()
-                    await asyncio.sleep(1)
-                    db = SessionLocal()
-                    continue
-
-                #if the alarm is therefore still active, execute the trip
-                trip_state["active"] = False
-                trip_state["remaining"] = 0
-
-                execute_kiln_trip(db)
-                db.commit()
 
         finally:
             db.close()

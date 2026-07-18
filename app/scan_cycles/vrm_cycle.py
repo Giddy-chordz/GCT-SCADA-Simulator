@@ -1,9 +1,64 @@
 #===========SCAN_CYCLE FOR THE VRM SECTION========
+import datetime
+
 from app.database import SessionLocal
 from app.models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus
 from sqlalchemy import and_
 import asyncio
 
+"""COUNT DOWN LOGIC FOR THE VRM EQUIPMENT"""
+#tracking the trip state for the VRM equipment
+trip_state = {
+    "active": False,
+    "remaining": 0,
+    "reason": None,
+    "equipment": None,
+    "started_at": None,
+}
+
+def _start_countdown(tag, equipment):
+    """Reset the shared trip_state to begin a fresh 120s countdown."""
+    trip_state["active"] = True
+    trip_state["remaining"] = 120
+    trip_state["reason"] = tag
+    trip_state["equipment"] = equipment
+    trip_state["started_at"] = datetime.utcnow().isoformat()
+ 
+ 
+def _clear_countdown():
+    """Reset the shared trip_state back to idle."""
+    trip_state["active"] = False
+    trip_state["remaining"] = 0
+    trip_state["reason"] = None
+    trip_state["equipment"] = None
+    trip_state["started_at"] = None
+
+async def _run_countdown(db, tag_id, alarm_types):
+    """
+    Runs the 120s countdown for a given tag, ticking trip_state
+    every second. Returns True if the countdown completed with the
+    alarm still active (meaning: proceed to trip). Returns False if
+    the alarm cleared during the countdown (meaning: cancel, no trip).
+    """
+    for sec in range(120, 0, -1):
+        trip_state["remaining"] = sec
+        await asyncio.sleep(1)
+ 
+        db.close()
+        db = SessionLocal()
+ 
+        still_active = db.query(Alarm).filter(and_(
+            Alarm.tag_id == tag_id,
+            Alarm.alarm_type.in_(alarm_types),
+            Alarm.alarm_active == True
+        )).first()
+ 
+        if not still_active:
+            _clear_countdown()
+            return False, db
+ 
+    return True, db
+ 
 
 #set running condition for the system
 async def run_sequence():
@@ -279,108 +334,63 @@ async def trip_reset():
     while True:
         db = SessionLocal()
         try:
-            #check if L2 or H2 alarm is active and then stop the equipment
+            # check if L2 or H2 alarm is active on bidirectional tags and then trip the equipment
+            tags = ["VRM-TT-030", "VRM-PT-060"]  # for both directions (L2 and H2)
 
-            tags = ["VRM-TT-030", "VRM-PT-060"]  #for both directions (L2 and H2)
             for tag in tags:
 
-                #query to identify the tag_id with active L2 or H2 alarm
+                # query to identify the tag_id with active L2 or H2 alarm
                 alarm_query = db.query(Alarm).filter(and_(
                     Alarm.tag_id == tag,
                     Alarm.alarm_type.in_(["L2", "H2"]),
                     Alarm.alarm_active == True
                 )).first()
 
-                #create a time delay of 120sec before tripping the equipment
-                trip_state = {"active": False, "remaining": 0, "reason": None}
-
-                #condition to check if H2 or L2 alarm is active
-                if alarm_query:
-
-                    db.close()
-                    #create a time delay of 120sec before tripping
-                    trip_state["active"] = True
-                    trip_state["remaining"] = 120
-                    trip_state["reason"] = tag
-
-                    for sec in range(120,0,-1):
-
-                        trip_state["remaining"] = sec
-
-                        await asyncio.sleep(1)
-
-                        db.close()
-                        db = SessionLocal()
-
-                        still_active = db.query(Alarm).filter(and_(
-                        Alarm.tag_id == tag,
-                        Alarm.alarm_type.in_(["L2", "H2"]),
-                        Alarm.alarm_active == True
-                    )).first()
-
-                        #if alarm is not active, stop the timer and prevent the trip
-                        if not still_active:
-                            trip_state["active"] = False
-                            trip_state["remaining"] = 0
-                            break
-
-                    #if the alarm is therefore still active, execute the trip
-                    execute_VRM_trip(db)
-                    db.commit()
-
-                else:
+                if not alarm_query:
                     continue
 
-            #repeat for unidirectional (H2 vibration alarm to trip the VRM)
+                # Only start a fresh countdown if one isn't already running
+                if not trip_state["active"]:
+                    _start_countdown(tag, "VRM-MD-001")
+
+                still_alarming, db = await _run_countdown(db, tag, ["L2", "H2"])
+
+                if not still_alarming:
+                    # alarm cleared mid-countdown — no trip
+                    continue
+
+                # alarm still active after full countdown — execute the trip
+                execute_VRM_trip(db)
+                db.commit()
+                _clear_countdown()
+
+            # repeat for unidirectional H2 vibration alarms
             vib_tags = ["VRM-VT-040", "VRM-VT-041", "VRM-VT-042"]
+
             for tag in vib_tags:
 
-                #query to identify the tag_id with active H2 alarm
                 alarm_query = db.query(Alarm).filter(and_(
                     Alarm.tag_id == tag,
                     Alarm.alarm_type == "H2",
                     Alarm.alarm_active == True
                 )).first()
 
-                #create a time delay of 120sec before tripping the equipment
-                trip_state = {"active": False, "remaining": 0, "reason": None}
-
-                if alarm_query:
-
-                    db.close()
-                    #create a time delay of 120sec before tripping
-                    trip_state["active"] = True
-                    trip_state["remaining"] = 120
-                    trip_state["reason"] = tag
-
-                    for sec in range(120,0,-1):
-
-                        trip_state["remaining"] = sec
-
-                        await asyncio.sleep(1)
-
-                    db = SessionLocal()
-                    #in order not to stop the equipment when the alarm has cleared during countdown
-                    #query to check if the alarm is still active
-                    still_active = db.query(Alarm).filter(and_(
-                        Alarm.tag_id == tag,
-                        Alarm.alarm_type == "H2",
-                        Alarm.alarm_active == True
-                    )).first()
-
-                    #if alarm is not active, stop the timer and prevent the trip
-                    if not still_active:
-                        continue
-
-                    #if the alarm is therefore still active, execute the trip
-                    trip_state["active"] = False
-                    trip_state["remaining"] = 0
-
-                    execute_VRM_trip(db)
-                    db.commit()
-
-                else:
+                if not alarm_query:
                     continue
+
+                if not trip_state["active"]:
+                    _start_countdown(tag, "VRM-MD-001")
+
+                still_alarming, db = await _run_countdown(db, tag, ["H2"])
+
+                if not still_alarming:
+                    # alarm cleared mid-countdown — no trip
+                    continue
+
+                # alarm still active after full countdown — execute the trip
+                execute_VRM_trip(db)
+                db.commit()
+                _clear_countdown()
 
         finally:
             db.close()

@@ -1,9 +1,66 @@
 #======================SCAN CYCLE FOR BAGFILTER==============
 #import all necessary libraries
+from datetime import datetime
+
 from app.database import SessionLocal
 from app.models import Equipments, AnalogTags, DigitalTags, Alarm
 import asyncio
 from sqlalchemy import and_
+
+"""COUNT DOWN LOGIC FOR THE BAGFILTER EQUIPMENT"""
+
+#tracking the trip state for the bagfilter equipment
+trip_state = {
+    "active": False,
+    "remaining": 0,
+    "reason": None,
+    "equipment": None,
+    "started_at": None,
+}
+
+def _start_countdown(tag, equipment):
+    """Reset the shared trip_state to begin a fresh 120s countdown."""
+    trip_state["active"] = True
+    trip_state["remaining"] = 120
+    trip_state["reason"] = tag
+    trip_state["equipment"] = equipment
+    trip_state["started_at"] = datetime.utcnow().isoformat()
+ 
+ 
+def _clear_countdown():
+    """Reset the shared trip_state back to idle."""
+    trip_state["active"] = False
+    trip_state["remaining"] = 0
+    trip_state["reason"] = None
+    trip_state["equipment"] = None
+    trip_state["started_at"] = None
+ 
+async def _run_countdown(db, tag_id, alarm_types):
+    """
+    Runs the 120s countdown for a given tag, ticking trip_state
+    every second. Returns True if the countdown completed with the
+    alarm still active (meaning: proceed to trip). Returns False if
+    the alarm cleared during the countdown (meaning: cancel, no trip).
+    """
+    for sec in range(120, 0, -1):
+        trip_state["remaining"] = sec
+        await asyncio.sleep(1)
+ 
+        db.close()
+        db = SessionLocal()
+ 
+        still_active = db.query(Alarm).filter(and_(
+            Alarm.tag_id == tag_id,
+            Alarm.alarm_type.in_(alarm_types),
+            Alarm.alarm_active == True
+        )).first()
+ 
+        if not still_active:
+            _clear_countdown()
+            return False, db
+ 
+    return True, db
+ 
 
 #define runnimg condition function for the baghouse
 async def running():
@@ -159,141 +216,59 @@ def execute_bagfilter_trip(db):
 
 #trip and reset logic
 async def trip_reset():
-
+ 
     while True:
         db = SessionLocal()
         try:
             #check if L2 or H2 alarm is active on bidirectional tags and then trip the equipment
             tags = ["KBF-DP-800", "KBF-PT-804"]  #for both directions (L2 and H2)
             for tag in tags:
-
+ 
                 #query to identify the tag_id with active L2 or H2 alarm
                 alarm_query = db.query(Alarm).filter(and_(
                     Alarm.tag_id == tag,
                     Alarm.alarm_type.in_(["L2", "H2"]),
                     Alarm.alarm_active == True
                 )).first()
-
-                #create a time delay of 120sec before tripping the equipment
-                trip_state = {"active": False, "remaining": 0, "reason": None}
-
-                #condition to check if H2 or L2 alarm is active
-                if alarm_query:
-
-                    db.close()
-                    #create a time delay of 120sec before tripping
-                    trip_state["active"] = True
-                    trip_state["remaining"] = 120
-                    trip_state["reason"] = tag
-
-                    for sec in range(120,0,-1):
-
-                        trip_state["remaining"] = sec
-
-                        await asyncio.sleep(1)
-
-                        db.close()
-                        db = SessionLocal()
-
-                        still_active = db.query(Alarm).filter(and_(
-
-                            Alarm.tag_id == tag,
-                            Alarm.alarm_type.in_(["L2","H2"]),
-                            Alarm.alarm_active == True
-
-                        )).first()
-
-                        if not still_active:
-
-                            trip_state["active"] = False
-                            trip_state["remaining"] = 0
-
-                            break
-
-                    db = SessionLocal()
-                    #query to check if the alarm is still active after the countdown
-                    still_active = db.query(Alarm).filter(and_(
-                        Alarm.tag_id == tag,
-                        Alarm.alarm_type.in_(["L2", "H2"]),
-                        Alarm.alarm_active == True
-                    )).first()
-
-                    #if alarm cleared during countdown, prevent the trip
-                    if not still_active:
-                        continue
-
-                    #if the alarm is still active, execute the trip
-                    execute_bagfilter_trip(db)
-                    db.commit()
-
-                else:
+ 
+                if not alarm_query:
                     continue
-
+ 
+                # Only start a fresh countdown if one isn't already running
+                if not trip_state["active"]:
+                    _start_countdown(tag, "KBF-MD-801")
+ 
+                still_alarming, db = await _run_countdown(db, tag, ["L2", "H2"])
+ 
+                if not still_alarming:
+                    # alarm cleared mid-countdown — no trip
+                    continue
+ 
+                #alarm still active after full countdown — execute the trip
+                execute_bagfilter_trip(db)
+                db.commit()
+                _clear_countdown()
+ 
             #repeat for unidirectional H2 alarm (high temperature trips the bagfilter)
             alarm_query = db.query(Alarm).filter(and_(
                 Alarm.tag_id == "KBF-TT-803",
                 Alarm.alarm_type == "H2",
                 Alarm.alarm_active == True
             )).first()
-
-            #create a time delay of 120sec before tripping the equipment
-            trip_state = {"active": False, "remaining": 0, "reason": None}
-
+ 
             if alarm_query:
-
-                db.close()
-                #create a time delay of 120sec before tripping
-                trip_state["active"] = True
-                trip_state["remaining"] = 120
-                trip_state["reason"] = "KBF-TT-803"
-
-                for sec in range(120,0,-1):
-
-                    trip_state["remaining"] = sec
-
-                    await asyncio.sleep(1)
-
-                    db.close()
-                    db = SessionLocal()
-
-                    still_active = db.query(Alarm).filter(and_(
-
-                        Alarm.tag_id == "KBF-TT-803",
-                        Alarm.alarm_type == "H2",
-                        Alarm.alarm_active == True
-
-                    )).first()
-
-                    if not still_active:
-
-                        trip_state["active"] = False
-                        trip_state["remaining"] = 0
-
-                        break
-
-                db = SessionLocal()
-                #query to check if the alarm is still active after the countdown
-                still_active = db.query(Alarm).filter(and_(
-                    Alarm.tag_id == "KBF-TT-803",
-                    Alarm.alarm_type == "H2",
-                    Alarm.alarm_active == True
-                )).first()
-
-                #if alarm cleared during countdown, prevent the trip
-                if not still_active:
-                    db.close()
-                    await asyncio.sleep(1)
-                    db = SessionLocal()
-                    continue
-
-                #if the alarm is still active, execute the trip
-                trip_state["active"] = False
-                trip_state["remaining"] = 0
-
-                execute_bagfilter_trip(db)
-                db.commit()
-
+ 
+                if not trip_state["active"]:
+                    _start_countdown("KBF-TT-803", "KBF-MD-801")
+ 
+                still_alarming, db = await _run_countdown(db, "KBF-TT-803", ["H2"])
+ 
+                if still_alarming:
+                    execute_bagfilter_trip(db)
+                    db.commit()
+                    _clear_countdown()
+ 
         finally:
             db.close()
-
+ 
         await asyncio.sleep(1)
