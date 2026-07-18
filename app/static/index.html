@@ -622,6 +622,268 @@
     padding: 16px; font-size: 12px; color: var(--text); line-height: 1.9;
     white-space: pre-wrap; font-family: var(--mono); min-height: 100px;
   }
+
+  /*=====================================================
+=            STICKY TRIP COUNTDOWN PANEL              =
+=====================================================*/
+
+:root{
+    --trip-green:#35c46b;
+    --trip-yellow:#f0b429;
+    --trip-red:#e53935;
+}
+
+/* floating panel */
+
+#trip-countdown{
+
+    position:fixed;
+
+    top:72px;
+    right:18px;
+
+    width:220px;
+
+    background:#252830;
+
+    border:1px solid #3b404d;
+
+    border-radius:10px;
+
+    box-shadow:
+        0 10px 25px rgba(0,0,0,.45);
+
+    z-index:9999;
+
+    display:none;
+
+    overflow:hidden;
+
+    animation:tripSlide .35s ease;
+}
+
+/* show */
+
+#trip-countdown.active{
+    display:block;
+}
+
+/* slide in */
+
+@keyframes tripSlide{
+
+    from{
+
+        opacity:0;
+        transform:translateX(25px);
+
+    }
+
+    to{
+
+        opacity:1;
+        transform:none;
+
+    }
+
+}
+
+/* flashing during final countdown */
+
+#trip-countdown.flash{
+
+    animation:
+        tripFlash .8s infinite,
+        tripSlide .35s ease;
+
+}
+
+@keyframes tripFlash{
+
+    0%{
+
+        border-color:#e53935;
+        box-shadow:0 0 6px #e53935;
+
+    }
+
+    50%{
+
+        border-color:#842222;
+        box-shadow:none;
+
+    }
+
+    100%{
+
+        border-color:#e53935;
+        box-shadow:0 0 6px #e53935;
+
+    }
+
+}
+
+.trip-header{
+
+    background:#1f2229;
+
+    border-bottom:1px solid #3b404d;
+
+    padding:8px;
+
+    text-align:center;
+
+    font-size:11px;
+
+    letter-spacing:.08em;
+
+    font-weight:700;
+
+    color:#d7dae5;
+
+    text-transform:uppercase;
+
+}
+
+.trip-body{
+
+    padding:16px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+}
+
+.trip-ring{
+
+    width:110px;
+
+    height:110px;
+
+}
+
+.trip-ring circle{
+
+    fill:none;
+
+    stroke-width:8;
+
+    transform:rotate(-90deg);
+
+    transform-origin:50% 50%;
+
+}
+
+.trip-bg{
+
+    stroke:#3b404d;
+
+}
+
+.trip-progress{
+
+    stroke:var(--trip-green);
+
+    stroke-linecap:round;
+
+    transition:
+
+        stroke .5s linear,
+
+        stroke-dashoffset 1s linear;
+
+}
+
+.trip-time{
+
+    position:absolute;
+
+    margin-top:37px;
+
+    width:110px;
+
+    text-align:center;
+
+    font-family:Consolas;
+
+    font-size:22px;
+
+    font-weight:bold;
+
+    color:#f2f2f2;
+
+}
+
+.trip-msg{
+
+    margin-top:16px;
+
+    text-align:center;
+
+    font-size:11px;
+
+    line-height:1.5;
+
+    color:#bfc5d2;
+
+}
+
+.trip-msg strong{
+
+    color:#ffffff;
+
+}
+
+.trip-footer{
+
+    border-top:1px solid #3b404d;
+
+    background:#1d2026;
+
+    padding:8px;
+
+    text-align:center;
+
+    font-size:10px;
+
+    color:#8f96a6;
+
+    letter-spacing:.05em;
+
+}
+
+/* trip completed */
+
+.trip-tripped{
+
+    background:#4d1111 !important;
+
+}
+
+.trip-tripped .trip-header{
+
+    background:#8f1b1b;
+
+    color:white;
+
+}
+
+.trip-tripped .trip-footer{
+
+    color:#ffffff;
+
+    font-weight:bold;
+
+}
+
+.trip-tripped .trip-progress{
+
+    stroke:var(--trip-red) !important;
+
+}
 </style>
 </head>
 <body>
@@ -1133,6 +1395,73 @@
   </div>
 </div>
 
+<!-- =========================================
+     STICKY TRIP COUNTDOWN
+========================================== -->
+
+<div id="trip-countdown">
+
+    <div class="trip-header">
+
+        ⚠ CRITICAL WARNING
+
+    </div>
+
+    <div class="trip-body">
+
+        <div style="position:relative">
+
+            <svg class="trip-ring" viewBox="0 0 120 120">
+
+                <circle
+                    class="trip-bg"
+                    cx="60"
+                    cy="60"
+                    r="50">
+                </circle>
+
+                <circle
+                    id="trip-progress"
+                    class="trip-progress"
+                    cx="60"
+                    cy="60"
+                    r="50">
+                </circle>
+
+            </svg>
+
+            <div
+                id="trip-time"
+                class="trip-time">
+
+                02:00
+
+            </div>
+
+        </div>
+
+        <div
+            class="trip-msg"
+            id="trip-message">
+
+            <strong>Process unstable</strong><br>
+
+            Correct condition before automatic trip.
+
+        </div>
+
+    </div>
+
+    <div
+        class="trip-footer"
+        id="trip-footer">
+
+        Countdown Active
+
+    </div>
+
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════════
 // STATE
@@ -1606,7 +1935,8 @@ function drawSparkline(canvas, data, h1, h2, l1, l2) {
   ctx.clearRect(0, 0, W, H);
   if (data.length < 2) return;
 
-  let mn = Math.min(...data), mx = Math.max(...data);
+  let mn = Math.min(...data);
+  let mx = Math.max(...data);
   if (mn === mx) { mn -= 1; mx += 1; }
   const padLo = (mx - mn) * 0.1, padHi = (mx - mn) * 0.1;
   const lo = mn - padLo, hi = mx + padHi;
@@ -2308,6 +2638,254 @@ function renderShiftReport(data) {
 connect();
 // Fetch health score on load so the overview strip is ready immediately
 fetchHealthScore(false);
+
+/*======================================================
+=            CRITICAL TRIP COUNTDOWN ENGINE            =
+======================================================*/
+
+const TRIP_DURATION = 120;
+
+let tripTimer = null;
+let tripRemaining = 0;
+let tripActive = false;
+
+const TRIP_RADIUS = 50;
+const TRIP_CIRC = 2 * Math.PI * TRIP_RADIUS;
+
+const tripPanel    = document.getElementById("trip-countdown");
+const tripRing     = document.getElementById("trip-progress");
+const tripTime     = document.getElementById("trip-time");
+const tripMessage  = document.getElementById("trip-message");
+const tripFooter   = document.getElementById("trip-footer");
+
+
+tripRing.style.strokeDashoffset = 0;
+
+
+/*---------------------------------------------*/
+
+function formatTripTime(sec){
+
+    const m = Math.floor(sec/60);
+    const s = sec%60;
+
+    return String(m).padStart(2,"0")
+            + ":"
+            + String(s).padStart(2,"0");
+
+}
+
+/*---------------------------------------------*/
+
+function updateTripRing(){
+
+    const percent = tripRemaining / TRIP_DURATION;
+
+    tripRing.style.strokeDashoffset =
+        TRIP_CIRC * (1-percent);
+
+    if(tripRemaining > 80){
+
+        tripRing.style.stroke = "#35c46b";
+
+        tripMessage.innerHTML =
+            "<strong>Process unstable</strong><br>Correct condition before automatic trip.";
+
+    }
+
+    else if(tripRemaining > 40){
+
+        tripRing.style.stroke = "#f0b429";
+
+        tripMessage.innerHTML =
+            "<strong>Critical Warning</strong><br>Operator intervention required.";
+
+    }
+
+    else{
+
+        tripRing.style.stroke = "#e53935";
+
+        tripMessage.innerHTML =
+            "<strong>Shutdown imminent</strong><br>Trip sequence armed.";
+
+    }
+
+    if(tripRemaining <= 30){
+
+        tripPanel.classList.add("flash");
+
+    }
+
+    else{
+
+        tripPanel.classList.remove("flash");
+
+    }
+
+}
+
+/*---------------------------------------------*/
+
+function updateTripDisplay(){
+
+    tripTime.innerHTML =
+        formatTripTime(tripRemaining);
+
+    tripFooter.innerHTML =
+        tripRemaining + " seconds remaining";
+
+    updateTripRing();
+
+}
+
+/*---------------------------------------------*/
+
+function startTripCountdown(reason="Critical Process Deviation"){
+
+    if(tripActive)
+        return;
+
+    tripActive = true;
+
+    tripRemaining = TRIP_DURATION;
+
+    tripPanel.classList.remove("trip-tripped");
+
+    tripPanel.classList.add("active");
+
+    tripMessage.innerHTML =
+        "<strong>"+reason+"</strong><br>Restore process before trip.";
+
+    updateTripDisplay();
+
+    clearInterval(tripTimer);
+
+    tripTimer = setInterval(function(){
+
+        tripRemaining--;
+
+        updateTripDisplay();
+
+        if(tripRemaining<=0){
+
+            clearInterval(tripTimer);
+
+            triggerSystemTrip();
+
+        }
+
+    },1000);
+
+}
+
+/*---------------------------------------------*/
+
+function cancelTripCountdown(){
+
+    clearInterval(tripTimer);
+
+    tripActive=false;
+
+    tripRemaining=0;
+
+    tripPanel.classList.remove("active");
+    tripPanel.classList.remove("flash");
+    tripPanel.classList.remove("trip-tripped");
+
+}
+
+/*---------------------------------------------*/
+
+function triggerSystemTrip(){
+
+    tripPanel.classList.add("trip-tripped");
+
+    tripPanel.classList.remove("flash");
+
+    tripTime.innerHTML = "TRIP";
+
+    tripFooter.innerHTML = "SYSTEM TRIPPED";
+
+    tripMessage.innerHTML =
+        "<strong>Automatic Shutdown Executed</strong><br>Equipment has been tripped.";
+
+}
+
+    /*
+    =======================================
+    YOUR SHUTDOWN CODE GOES HERE
+    =======================================
+
+    Everything below can call your
+    existing simulator logic.
+
+    Examples:
+
+    addAlarm(...)
+
+    stopEquipment(...)
+
+    tripEquipment(...)
+
+    updateOverview();
+
+    refreshMimic();
+
+    etc.
+
+    =======================================
+    */
+
+
+async function syncTripCountdown() {
+
+    try {
+
+        const res = await fetch("/trip-status");
+
+        const trip = await res.json();
+
+        if (!trip.active) {
+
+            cancelTripCountdown();
+            return;
+
+        }
+
+        // Show panel only when countdown is active
+        tripPanel.classList.add("active");
+
+        tripRemaining = trip.remaining;
+
+        tripMessage.innerHTML =
+            `<strong>${trip.equipment}</strong><br>${trip.reason}`;
+
+        updateTripDisplay();
+
+        // If backend has completed the trip
+        if (trip.remaining <= 0) {
+
+            triggerSystemTrip();
+
+        }
+
+    } catch (err) {
+
+        console.error("Trip countdown sync failed", err);
+
+    }
+
+}
+
+// Poll backend every second
+setInterval(syncTripCountdown, 1000);
+
+// Initial load
+syncTripCountdown();
+
+
 </script>
+
 </body>
 </html>

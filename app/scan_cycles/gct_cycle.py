@@ -7,7 +7,7 @@ import asyncio
 
 #set running condition for the system
 async def running():
-
+    print("gct running")
     while True:
         # Fresh session every iteration — ensures HTTP command endpoint changes
         # (e.g. manual_override flag) are immediately visible to the scan cycle.
@@ -70,26 +70,27 @@ async def alarm():
 
                 #query the analog_tags table to check if alarm
                 row_query = db.query(AnalogTags).filter(AnalogTags.tag_id == tag).first()
+                
                 if not row_query:
                     continue
 
                 #compare the process values to the alarm values
-                if row_query.process_val <= row_query.l2_val:
+                if row_query.l2_val is not None and row_query.process_val <= row_query.l2_val:
                     alarm_type = "L2"
                     alarm_active = True
                     alarm_descr = f"{tag} L2 alarm"
 
-                elif row_query.process_val <= row_query.l1_val:
+                elif row_query.l1_val is not None and row_query.process_val <= row_query.l1_val:
                     alarm_type = "L1"
                     alarm_active = True
                     alarm_descr = f"{tag} L1 alarm"
 
-                elif row_query.process_val >= row_query.h2_val:
+                elif row_query.h2_val is not None and row_query.process_val >= row_query.h2_val:
                     alarm_type = "H2"
                     alarm_active = True
                     alarm_descr = f"{tag} H2 alarm"
 
-                elif row_query.process_val >= row_query.h1_val:
+                elif row_query.h1_val is not None and row_query.process_val >= row_query.h1_val:
                     alarm_type = "H1"
                     alarm_active = True
                     alarm_descr = f"{tag} H1 alarm"
@@ -122,6 +123,12 @@ async def alarm():
                 db.add(new_alarm)
 
             db.commit()
+
+        except Exception as e:
+            print(f"[ALARM TASK CRASHED] {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+
         finally:
             db.close()
 
@@ -182,12 +189,41 @@ async def trip_reset():
                     Alarm.alarm_active == True
                 )).first()
 
+                #count down timer for 120 seconds before tripping the equipment
+                trip_state = {"active": False, "remaining": 0, "reason": None}
+
                 #condition to check if H2 or L2 alarm is active
                 if alarm_query:
 
                     db.close()
                     #create a time delay of 120sec before tripping
-                    await asyncio.sleep(120)
+                    trip_state["active"] = True
+                    trip_state["remaining"] = 120
+                    trip_state["reason"] = tag
+
+                    for sec in range(120,0,-1):
+
+                        trip_state["remaining"] = sec
+
+                        await asyncio.sleep(1)
+
+                        db.close()
+                        db = SessionLocal()
+
+                        still_active = db.query(Alarm).filter(and_(
+
+                            Alarm.tag_id == tag,
+                            Alarm.alarm_type.in_(["L2","H2"]),
+                            Alarm.alarm_active == True
+
+                        )).first()
+
+                        if not still_active:
+
+                            trip_state["active"] = False
+                            trip_state["remaining"] = 0
+
+                            break
 
                     db = SessionLocal()
                     #in order not to stop the equipment when the alarm has cleared during countdown
@@ -216,11 +252,40 @@ async def trip_reset():
                 Alarm.alarm_active == True
             )).first()
 
+            #count down timer for 120 seconds before tripping the equipment
+            trip_state = {"active": False, "remaining": 0, "reason": None}
+
             if alarm_query:
 
                 db.close()
                 #create a time delay of 120sec before tripping
-                await asyncio.sleep(120)
+                trip_state["active"] = True
+                trip_state["remaining"] = 120
+                trip_state["reason"] = tag
+
+                for sec in range(120,0,-1):
+
+                    trip_state["remaining"] = sec
+
+                    await asyncio.sleep(1)
+
+                    db.close()
+                    db = SessionLocal()
+
+                    still_active = db.query(Alarm).filter(and_(
+
+                        Alarm.tag_id == tag,
+                        Alarm.alarm_type.in_(["L2","H2"]),
+                        Alarm.alarm_active == True
+
+                    )).first()
+
+                    if not still_active:
+
+                        trip_state["active"] = False
+                        trip_state["remaining"] = 0
+
+                        break
 
                 db = SessionLocal()
                 #in order not to stop the equipment when the alarm has cleared during countdown
@@ -239,6 +304,9 @@ async def trip_reset():
                     continue
 
                 #if the alarm is therefore still active, execute the trip
+                trip_state["active"] = False
+                trip_state["remaining"] = 0
+
                 execute_kiln_trip(db)
                 db.commit()
 

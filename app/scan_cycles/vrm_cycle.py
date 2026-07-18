@@ -103,22 +103,22 @@ async def alarm():
                     continue
 
                 #compare the process values to the alarm values
-                if row_query.process_val <= row_query.l2_val:
+                if row_query.l2_val is not None and row_query.process_val <= row_query.l2_val:
                     alarm_type = "L2"
                     alarm_active = True
                     alarm_descr = f"{tag} L2 alarm"
 
-                elif row_query.process_val <= row_query.l1_val:
+                elif row_query.l1_val is not None and row_query.process_val <= row_query.l1_val:
                     alarm_type = "L1"
                     alarm_active = True
                     alarm_descr = f"{tag} L1 alarm"
 
-                elif row_query.process_val >= row_query.h2_val:
+                elif row_query.h2_val is not None and row_query.process_val >= row_query.h2_val:
                     alarm_type = "H2"
                     alarm_active = True
                     alarm_descr = f"{tag} H2 alarm"
 
-                elif row_query.process_val >= row_query.h1_val:
+                elif row_query.h1_val is not None and row_query.process_val >= row_query.h1_val:
                     alarm_type = "H1"
                     alarm_active = True
                     alarm_descr = f"{tag} H1 alarm"
@@ -291,25 +291,38 @@ async def trip_reset():
                     Alarm.alarm_active == True
                 )).first()
 
+                #create a time delay of 120sec before tripping the equipment
+                trip_state = {"active": False, "remaining": 0, "reason": None}
+
                 #condition to check if H2 or L2 alarm is active
                 if alarm_query:
 
                     db.close()
                     #create a time delay of 120sec before tripping
-                    await asyncio.sleep(120)
+                    trip_state["active"] = True
+                    trip_state["remaining"] = 120
+                    trip_state["reason"] = tag
 
-                    db = SessionLocal()
-                    #in order not to stop the equipment when the alarm has cleared during countdown
-                    #query to check if the alarm is still active
-                    still_active = db.query(Alarm).filter(and_(
+                    for sec in range(120,0,-1):
+
+                        trip_state["remaining"] = sec
+
+                        await asyncio.sleep(1)
+
+                        db.close()
+                        db = SessionLocal()
+
+                        still_active = db.query(Alarm).filter(and_(
                         Alarm.tag_id == tag,
                         Alarm.alarm_type.in_(["L2", "H2"]),
                         Alarm.alarm_active == True
                     )).first()
 
-                    #if alarm is not active, stop the timer and prevent the trip
-                    if not still_active:
-                        continue
+                        #if alarm is not active, stop the timer and prevent the trip
+                        if not still_active:
+                            trip_state["active"] = False
+                            trip_state["remaining"] = 0
+                            break
 
                     #if the alarm is therefore still active, execute the trip
                     execute_VRM_trip(db)
@@ -329,11 +342,22 @@ async def trip_reset():
                     Alarm.alarm_active == True
                 )).first()
 
+                #create a time delay of 120sec before tripping the equipment
+                trip_state = {"active": False, "remaining": 0, "reason": None}
+
                 if alarm_query:
 
                     db.close()
                     #create a time delay of 120sec before tripping
-                    await asyncio.sleep(120)
+                    trip_state["active"] = True
+                    trip_state["remaining"] = 120
+                    trip_state["reason"] = tag
+
+                    for sec in range(120,0,-1):
+
+                        trip_state["remaining"] = sec
+
+                        await asyncio.sleep(1)
 
                     db = SessionLocal()
                     #in order not to stop the equipment when the alarm has cleared during countdown
@@ -349,6 +373,9 @@ async def trip_reset():
                         continue
 
                     #if the alarm is therefore still active, execute the trip
+                    trip_state["active"] = False
+                    trip_state["remaining"] = 0
+
                     execute_VRM_trip(db)
                     db.commit()
 

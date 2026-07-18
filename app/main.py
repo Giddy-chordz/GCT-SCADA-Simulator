@@ -19,7 +19,6 @@ from app.ai.health_score import calculate_health_score
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     tasks = [
@@ -59,6 +58,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ============================================
+# Global Trip Countdown State
+# ============================================
+
+trip_state = {
+    "active": False,
+    "remaining": 0,
+    "reason": "",
+    "equipment": "",
+    "started_at": None
+}
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -103,6 +114,20 @@ def _zsc_tag(tag_id: str) -> str:
 
 def _is_valve(tag_id: str) -> bool:
     return "-XV-" in tag_id
+
+@app.get("/trip-status", tags=["Trips"])
+async def get_trip_status():
+    """
+    Returns the active automatic trip countdown.
+    """
+
+    return {
+        "active": trip_state["active"],
+        "remaining": trip_state["remaining"],
+        "reason": trip_state["reason"],
+        "equipment": trip_state["equipment"],
+        "started_at": trip_state["started_at"]
+    }
 
 
 @app.post("/cmd/vrm-mill/start", tags=["Commands"])
