@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models import AnalogTags, Equipments
-from app.ai.groq_client import call_ai
+from app.ai.groq_client import call_granite
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ async def _check_analog_tags(db) -> None:
             row.tag_id, alarm_type, row.process_val, setpoint,
             row.param_unit or ""
         )
-        recommendation = await call_ai(prompt)
+        recommendation = await call_granite(prompt)
 
         copilot_messages.append({
             "tag_id": row.tag_id,
@@ -222,7 +222,7 @@ async def _check_equipment_status(db) -> None:
             f"telling the operator what to check or do next. "
             f"Speak like an experienced colleague, not a formal report."
         )
-        recommendation = await call_ai(prompt)
+        recommendation = await call_granite(prompt)
 
         copilot_messages.append({
             "tag_id": row.tag_id,

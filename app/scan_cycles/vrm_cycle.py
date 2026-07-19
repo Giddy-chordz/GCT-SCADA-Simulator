@@ -1,5 +1,5 @@
 #===========SCAN_CYCLE FOR THE VRM SECTION========
-import datetime
+from datetime import datetime
 
 from app.database import SessionLocal
 from app.models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus

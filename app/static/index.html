@@ -627,159 +627,85 @@
 =            STICKY TRIP COUNTDOWN PANEL              =
 =====================================================*/
 
+/*=====================================================
+=          FLOATING TRIP COUNTDOWN RING
+=====================================================*/
+
 :root{
-    --trip-green:#35c46b;
-    --trip-yellow:#f0b429;
-    --trip-red:#e53935;
+    --trip-green:#29d96d;
+    --trip-yellow:#ffbf3c;
+    --trip-red:#ff3b30;
 }
 
-/* floating panel */
+/* Floating widget */
 
 #trip-countdown{
 
     position:fixed;
 
-    top:72px;
-    right:18px;
+    top:75px;
+    right:25px;
 
-    width:220px;
-
-    background:#252830;
-
-    border:1px solid #3b404d;
-
-    border-radius:10px;
-
-    box-shadow:
-        0 10px 25px rgba(0,0,0,.45);
-
-    z-index:9999;
+    width:150px;
+    height:150px;
 
     display:none;
 
-    overflow:hidden;
+    justify-content:center;
+    align-items:center;
 
-    animation:tripSlide .35s ease;
+    z-index:9999;
+
+    animation:tripAppear .35s ease;
 }
-
-/* show */
 
 #trip-countdown.active{
-    display:block;
+    display:flex;
 }
 
-/* slide in */
-
-@keyframes tripSlide{
+@keyframes tripAppear{
 
     from{
-
         opacity:0;
-        transform:translateX(25px);
-
+        transform:scale(.8);
     }
 
     to{
-
         opacity:1;
-        transform:none;
-
+        transform:scale(1);
     }
 
 }
 
-/* flashing during final countdown */
-
-#trip-countdown.flash{
-
-    animation:
-        tripFlash .8s infinite,
-        tripSlide .35s ease;
-
-}
-
-@keyframes tripFlash{
-
-    0%{
-
-        border-color:#e53935;
-        box-shadow:0 0 6px #e53935;
-
-    }
-
-    50%{
-
-        border-color:#842222;
-        box-shadow:none;
-
-    }
-
-    100%{
-
-        border-color:#e53935;
-        box-shadow:0 0 6px #e53935;
-
-    }
-
-}
-
-.trip-header{
-
-    background:#1f2229;
-
-    border-bottom:1px solid #3b404d;
-
-    padding:8px;
-
-    text-align:center;
-
-    font-size:11px;
-
-    letter-spacing:.08em;
-
-    font-weight:700;
-
-    color:#d7dae5;
-
-    text-transform:uppercase;
-
-}
-
-.trip-body{
-
-    padding:16px;
-
-    display:flex;
-
-    flex-direction:column;
-
-    align-items:center;
-
-}
+/*=====================================================
+=                    SVG RING
+=====================================================*/
 
 .trip-ring{
 
-    width:110px;
+    width:150px;
+    height:150px;
 
-    height:110px;
-
+    filter:
+        drop-shadow(0 0 10px rgba(0,0,0,.55))
+        drop-shadow(0 0 18px rgba(0,0,0,.35));
 }
 
 .trip-ring circle{
 
     fill:none;
 
-    stroke-width:8;
+    stroke-width:10;
 
     transform:rotate(-90deg);
 
-    transform-origin:50% 50%;
+    transform-origin:center;
 
 }
 
 .trip-bg{
 
-    stroke:#3b404d;
+    stroke:rgba(255,255,255,.08);
 
 }
 
@@ -790,98 +716,206 @@
     stroke-linecap:round;
 
     transition:
-
-        stroke .5s linear,
-
+        stroke .4s linear,
         stroke-dashoffset 1s linear;
 
 }
+
+/*=====================================================
+=                    TIMER
+=====================================================*/
 
 .trip-time{
 
     position:absolute;
 
-    margin-top:37px;
-
-    width:110px;
+    width:150px;
 
     text-align:center;
 
-    font-family:Consolas;
+    font-family:"Consolas", monospace;
 
-    font-size:22px;
+    font-size:36px;
 
-    font-weight:bold;
+    font-weight:700;
 
-    color:#f2f2f2;
+    color:#ffffff;
 
+    text-shadow:
+        0 0 8px rgba(255,255,255,.35);
+
+    pointer-events:none;
 }
 
-.trip-msg{
+/* Seconds label */
 
-    margin-top:16px;
+.trip-time small{
 
-    text-align:center;
+    display:block;
+
+    margin-top:3px;
 
     font-size:11px;
 
-    line-height:1.5;
-
     color:#bfc5d2;
+
+    letter-spacing:.15em;
+
+}
+
+/*=====================================================
+=                 MESSAGE BELOW
+=====================================================*/
+
+.trip-msg{
+
+    position:absolute;
+
+    top:165px;
+
+    width:220px;
+
+    left:50%;
+
+    transform:translateX(-50%);
+
+    text-align:center;
+
+    font-size:12px;
+
+    color:#cfd6df;
+
+    line-height:1.4;
 
 }
 
 .trip-msg strong{
 
-    color:#ffffff;
-
-}
-
-.trip-footer{
-
-    border-top:1px solid #3b404d;
-
-    background:#1d2026;
-
-    padding:8px;
-
-    text-align:center;
-
-    font-size:10px;
-
-    color:#8f96a6;
-
-    letter-spacing:.05em;
-
-}
-
-/* trip completed */
-
-.trip-tripped{
-
-    background:#4d1111 !important;
-
-}
-
-.trip-tripped .trip-header{
-
-    background:#8f1b1b;
-
     color:white;
 
 }
 
-.trip-tripped .trip-footer{
+/*=====================================================
+=              FINAL COUNTDOWN EFFECT
+=====================================================*/
 
-    color:#ffffff;
+#trip-countdown.flash{
 
-    font-weight:bold;
+    animation:pulse .8s infinite;
 
 }
 
+@keyframes pulse{
+
+    0%{
+
+        transform:scale(1);
+
+        filter:drop-shadow(0 0 8px #ff3b30);
+
+    }
+
+    50%{
+
+        transform:scale(1.06);
+
+        filter:drop-shadow(0 0 22px #ff3b30);
+
+    }
+
+    100%{
+
+        transform:scale(1);
+
+        filter:drop-shadow(0 0 8px #ff3b30);
+
+    }
+
+}
+
+/*=====================================================
+=              TRIPPED STATE
+=====================================================*/
+
 .trip-tripped .trip-progress{
 
-    stroke:var(--trip-red) !important;
+    stroke:var(--trip-red);
+
+}
+
+.trip-tripped .trip-time{
+
+    color:#ff4b4b;
+
+    text-shadow:
+        0 0 10px rgba(255,60,60,.7);
+
+}
+
+.trip-tripped{
+
+    animation:tripAlarm .9s infinite;
+
+}
+
+@keyframes tripAlarm{
+
+    0%{
+
+        transform:scale(1);
+
+    }
+
+    50%{
+
+        transform:scale(1.08);
+
+    }
+
+    100%{
+
+        transform:scale(1);
+
+    }
+
+}
+.trip-ring-wrapper{
+
+    position:relative;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+}
+
+.trip-ring circle{
+
+    fill:none;
+
+    transform:rotate(-90deg);
+
+    transform-origin:50% 50%;
+
+}
+
+.trip-progress{
+
+    fill:none;
+
+    stroke-width:10;
+
+    stroke-linecap:round;
+
+    stroke-dasharray:314.159;
+
+    stroke-dashoffset:0;
+
+    transition:
+        stroke-dashoffset 1s linear,
+        stroke .4s ease;
 
 }
 </style>
@@ -1401,62 +1435,45 @@
 
 <div id="trip-countdown">
 
-    <div class="trip-header">
+    <div class="trip-ring-wrapper">
 
-        ⚠ CRITICAL WARNING
+        <svg class="trip-ring" viewBox="0 0 120 120">
 
-    </div>
+            <circle
+                class="trip-bg"
+                cx="60"
+                cy="60"
+                r="50">
+            </circle>
 
-    <div class="trip-body">
+            <circle
+                id="trip-progress"
+                class="trip-progress"
+                cx="60"
+                cy="60"
+                r="50">
+            </circle>
 
-        <div style="position:relative">
-
-            <svg class="trip-ring" viewBox="0 0 120 120">
-
-                <circle
-                    class="trip-bg"
-                    cx="60"
-                    cy="60"
-                    r="50">
-                </circle>
-
-                <circle
-                    id="trip-progress"
-                    class="trip-progress"
-                    cx="60"
-                    cy="60"
-                    r="50">
-                </circle>
-
-            </svg>
-
-            <div
-                id="trip-time"
-                class="trip-time">
-
-                02:00
-
-            </div>
-
-        </div>
+        </svg>
 
         <div
-            class="trip-msg"
-            id="trip-message">
+            id="trip-time"
+            class="trip-time">
 
-            <strong>Process unstable</strong><br>
+            02:00
 
-            Correct condition before automatic trip.
+            <small>SECONDS</small>
 
         </div>
 
     </div>
 
     <div
-        class="trip-footer"
-        id="trip-footer">
+        id="trip-message"
+        class="trip-msg">
 
-        Countdown Active
+        <strong>CRITICAL TRIP TIMER</strong><br>
+        Plant will trip unless the alarm condition is cleared.
 
     </div>
 
@@ -2656,10 +2673,12 @@ const tripPanel    = document.getElementById("trip-countdown");
 const tripRing     = document.getElementById("trip-progress");
 const tripTime     = document.getElementById("trip-time");
 const tripMessage  = document.getElementById("trip-message");
-const tripFooter   = document.getElementById("trip-footer");
 
 
+tripRing.style.strokeDasharray = TRIP_CIRC;
 tripRing.style.strokeDashoffset = 0;
+tripRing.style.transition =
+    "stroke-dashoffset 1s linear, stroke .4s ease";
 
 
 /*---------------------------------------------*/
@@ -2679,12 +2698,17 @@ function formatTripTime(sec){
 
 function updateTripRing(){
 
-    const percent = tripRemaining / TRIP_DURATION;
+    // Clamp the value between 0 and 120
+    const remaining = Math.max(0, Math.min(TRIP_DURATION, tripRemaining));
 
-    tripRing.style.strokeDashoffset =
-        TRIP_CIRC * (1-percent);
+    const percent = remaining / TRIP_DURATION;
 
-    if(tripRemaining > 80){
+    const offset = TRIP_CIRC * (1 - percent);
+
+    tripRing.style.strokeDashoffset = offset;
+
+    // Green
+    if(remaining > 80){
 
         tripRing.style.stroke = "#35c46b";
 
@@ -2693,7 +2717,8 @@ function updateTripRing(){
 
     }
 
-    else if(tripRemaining > 40){
+    // Yellow
+    else if(remaining > 40){
 
         tripRing.style.stroke = "#f0b429";
 
@@ -2702,6 +2727,7 @@ function updateTripRing(){
 
     }
 
+    // Red
     else{
 
         tripRing.style.stroke = "#e53935";
@@ -2711,12 +2737,11 @@ function updateTripRing(){
 
     }
 
-    if(tripRemaining <= 30){
+    if(remaining <= 30){
 
         tripPanel.classList.add("flash");
 
     }
-
     else{
 
         tripPanel.classList.remove("flash");
@@ -2730,10 +2755,8 @@ function updateTripRing(){
 function updateTripDisplay(){
 
     tripTime.innerHTML =
-        formatTripTime(tripRemaining);
-
-    tripFooter.innerHTML =
-        tripRemaining + " seconds remaining";
+        `${formatTripTime(tripRemaining)}
+        <small>SECONDS</small>`;
 
     updateTripRing();
 
@@ -2803,9 +2826,9 @@ function triggerSystemTrip(){
 
     tripPanel.classList.remove("flash");
 
-    tripTime.innerHTML = "TRIP";
-
-    tripFooter.innerHTML = "SYSTEM TRIPPED";
+    tripTime.innerHTML =
+    `TRIP
+     <small>EXECUTED</small>`;
 
     tripMessage.innerHTML =
         "<strong>Automatic Shutdown Executed</strong><br>Equipment has been tripped.";
