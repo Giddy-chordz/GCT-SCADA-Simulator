@@ -187,7 +187,7 @@ These are documented, not hidden — the priority was a working, honest system o
 
 ## About the Builder
 
-Built by **Gideon Oyegbami (Reon)**, an Automation & Instrumentation Technician at Lafarge Africa, with ~4 years of experience in industrial automation — Allen-Bradley PLCs, SCADA/HMI systems, process instrumentation, and industrial networking.
+Built by **Gideon Oyegbami **, an Eleclrical Electronics Engineering student, with experience in industrial automation — Allen-Bradley PLCs, SCADA/HMI systems, process instrumentation, and industrial networking.
 
 This project reflects real domain knowledge from daily work on cement plant control systems, combined with self-taught backend development (Python, FastAPI, SQLAlchemy) and this project's use of IBM Bob as a development partner.
 
