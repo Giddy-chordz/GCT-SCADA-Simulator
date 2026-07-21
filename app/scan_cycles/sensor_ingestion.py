@@ -1,7 +1,7 @@
 #=============CONTINOUSLY UPDATING SENSOR READINGS==========
-from app.database import SessionLocal
-from app.models import AnalogTags, DigitalTags
-from app.sensor_data import AnalogSensor, sensors
+from database import SessionLocal
+from models import AnalogTags, DigitalTags
+from sensor_data import AnalogSensor, sensors
 import asyncio
 import random
 
