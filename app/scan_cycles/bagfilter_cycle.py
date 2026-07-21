@@ -2,8 +2,8 @@
 #import all necessary libraries
 from datetime import datetime
 
-from app.database import SessionLocal
-from app.models import Equipments, AnalogTags, DigitalTags, Alarm
+from database import SessionLocal
+from models import Equipments, AnalogTags, DigitalTags, Alarm
 import asyncio
 from sqlalchemy import and_
 

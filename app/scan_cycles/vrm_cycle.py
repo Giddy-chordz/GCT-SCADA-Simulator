@@ -1,8 +1,8 @@
 #===========SCAN_CYCLE FOR THE VRM SECTION========
 from datetime import datetime
 
-from app.database import SessionLocal
-from app.models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus
+from database import SessionLocal
+from models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus
 from sqlalchemy import and_
 import asyncio
 

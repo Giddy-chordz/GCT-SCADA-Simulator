@@ -19,9 +19,9 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from app.database import SessionLocal
-from app.models import AnalogTags, Equipments
-from app.ai.groq_client import call_granite
+from database import SessionLocal
+from models import AnalogTags, Equipments
+from ai.groq_client import call_granite
 
 logger = logging.getLogger(__name__)
 

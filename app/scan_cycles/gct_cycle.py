@@ -1,6 +1,6 @@
 #===========SCAN_CYCLE FOR THE GCT SECTION========
-from app.database import SessionLocal
-from app.models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus
+from database import SessionLocal
+from models import Equipments, AnalogTags, DigitalTags, Alarm, GroupStatus
 from sqlalchemy import and_
 import asyncio
 from datetime import datetime

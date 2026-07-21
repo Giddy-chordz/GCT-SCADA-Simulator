@@ -12,8 +12,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.ai.groq_client import call_granite
-from app.models import Alarm, Equipments
+from ai.groq_client import call_granite
+from models import Alarm, Equipments
 
 logger = logging.getLogger(__name__)
 
