@@ -2,7 +2,7 @@ print("connecting to db...")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from .config import DATABASE_URL
+from config import DATABASE_URL
 
 
 #base class for models
