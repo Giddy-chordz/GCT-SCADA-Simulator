@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, ForeignKey
-from .database import Base
+from database import Base
 from datetime import datetime
 
 #create a model for equpment tags and their status

@@ -8,21 +8,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import SessionLocal
-from app.models import Alarm, AnalogTags, DigitalTags, Equipments
-from app.scan_cycles import bagfilter_cycle, gct_cycle, vrm_cycle
-from app.scan_cycles.sensor_ingestion import sensor_vals
-from app.websocket import ws_tags
-from app.ai.root_cause import analyze_alarm
-from app.ai.shift_report import generate_shift_report
-from app.ai.health_score import calculate_health_score
-from app.scan_cycles.gct_cycle import trip_state as gct_trip_state
-from app.scan_cycles.vrm_cycle import trip_state as vrm_trip_state
-from app.scan_cycles.bagfilter_cycle import trip_state as kbf_trip_state
-from app.ai.ai_copilot import ai_copilot, copilot_messages
+from database import SessionLocal
+from models import Alarm, AnalogTags, DigitalTags, Equipments
+from scan_cycles import bagfilter_cycle, gct_cycle, vrm_cycle
+from scan_cycles.sensor_ingestion import sensor_vals
+from websocket import ws_tags
+from ai.root_cause import analyze_alarm
+from ai.shift_report import generate_shift_report
+from ai.health_score import calculate_health_score
+from scan_cycles.gct_cycle import trip_state as gct_trip_state
+from scan_cycles.vrm_cycle import trip_state as vrm_trip_state
+from scan_cycles.bagfilter_cycle import trip_state as kbf_trip_state
+from ai.ai_copilot import ai_copilot, copilot_messages
 
-import os
-print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 
 
 STATIC_DIR = Path(__file__).parent / "static"

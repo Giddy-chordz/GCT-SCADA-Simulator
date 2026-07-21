@@ -4,8 +4,8 @@ import logging
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.database import SessionLocal
-from app.models import Alarm, AnalogTags, DigitalTags, Equipments
+from database import SessionLocal
+from models import Alarm, AnalogTags, DigitalTags, Equipments
 
 logger = logging.getLogger(__name__)
 
