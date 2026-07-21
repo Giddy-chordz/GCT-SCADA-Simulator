@@ -1,8 +1,9 @@
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override = True)
+    
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ── IBM watsonx / Granite configuration ──────────────────────────────────────
+print("DATABASE_URL from config.py:", DATABASE_URL)

@@ -21,6 +21,9 @@ from app.scan_cycles.vrm_cycle import trip_state as vrm_trip_state
 from app.scan_cycles.bagfilter_cycle import trip_state as kbf_trip_state
 from app.ai.ai_copilot import ai_copilot, copilot_messages
 
+import os
+print("DATABASE_URL:", os.getenv("DATABASE_URL"))
+
 
 STATIC_DIR = Path(__file__).parent / "static"
 
