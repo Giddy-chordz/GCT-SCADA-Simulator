@@ -139,7 +139,18 @@ async def get_trip_status():
             return ts
     return {"active": False, "remaining": 0, "reason": None, "equipment": None, "started_at": None}
 
-
+#test for groq network
+@app.get("/debug/test-groq")
+async def test_groq_connectivity():
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get("https://api.groq.com")
+            return {"status": "reached", "code": response.status_code}
+    except Exception as e:
+        return {"status": "failed", "error": str(e), "error_type": type(e).__name__}
+    
+    
 @app.post("/cmd/vrm-mill/start", tags=["Commands"])
 async def cmd_vrm_mill_start():
     """Start VRM mill drive (VRM-MD-010) with all required permissives checked (1d).
