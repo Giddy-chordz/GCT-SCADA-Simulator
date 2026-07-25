@@ -1,10 +1,8 @@
 """
 Shared async client for the Groq Chat Completions API.
-
 All AI features should call call_granite() so the rest of the
 application doesn't need to change.
 """
-print("Loaded:", __file__)
 import asyncio
 import logging
 import os
@@ -12,15 +10,12 @@ import os
 import httpx
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Configuration
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-GENERATION_TIMEOUT = 10.0
-
+GENERATION_TIMEOUT = 15.0  # bumped from 10 — Render's outbound path to Groq may be slower
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
@@ -33,13 +28,12 @@ async def call_granite(
 ) -> str:
     """
     Send a prompt to Groq and return the generated text.
-
-    Returns fallback_text on any error so callers never
-    need to catch exceptions.
+    Returns fallback_text on any error so callers never need to catch exceptions.
     """
-
-    # Read API key every call so .env changes are picked up
     api_key = os.getenv("GROQ_API_KEY")
+
+    # Debug line — safe to leave in temporarily, never prints the key itself
+    logger.info("GROQ_API_KEY present: %s (length %d)", bool(api_key), len(api_key) if api_key else 0)
 
     if not api_key:
         logger.warning("GROQ_API_KEY is not configured.")
@@ -47,16 +41,10 @@ async def call_granite(
 
     payload = {
         "model": GROQ_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
+        "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature,
         "max_tokens": max_new_tokens,
     }
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -64,31 +52,21 @@ async def call_granite(
 
     try:
         async with httpx.AsyncClient(timeout=GENERATION_TIMEOUT) as client:
-            response = await client.post(
-                API_URL,
-                json=payload,
-                headers=headers,
-            )
-
+            response = await client.post(API_URL, json=payload, headers=headers)
             response.raise_for_status()
-
             data = response.json()
-
         return data["choices"][0]["message"]["content"].strip()
 
     except asyncio.TimeoutError:
-        logger.warning(
-            "Groq API timed out after %.1f seconds.",
-            GENERATION_TIMEOUT,
-        )
+        logger.warning("Groq API timed out after %.1f seconds.", GENERATION_TIMEOUT)
+        return fallback_text
+
+    except httpx.ConnectTimeout:
+        logger.warning("Groq API connection timed out — network reachability issue.")
         return fallback_text
 
     except httpx.HTTPStatusError as exc:
-        logger.warning(
-            "Groq HTTP error %s: %s",
-            exc.response.status_code,
-            exc.response.text,
-        )
+        logger.warning("Groq HTTP error %s: %s", exc.response.status_code, exc.response.text)
         return fallback_text
 
     except (KeyError, IndexError, TypeError):
